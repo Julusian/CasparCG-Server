@@ -1,0 +1,27 @@
+version: 2.2.{build}-{branch}
+
+image:
+  - Visual Studio 2017
+  - ubuntu
+
+services:
+  - docker
+
+clone_depth: 1
+
+cache:
+  - '%LocalAppData%\NuGet\v3-cache'
+
+build_script:
+  - cmd: .\tools\windows\build.bat
+  - sh: ./tools/linux/ensure-base-images
+  - sh: ./tools/linux/build-in-docker
+  - sh: ./tools/linux/extract-from-docker
+  - sh: zip -r casparcg_server_linux.zip casparcg_server/
+
+artifacts:
+  - path: dist\casparcg_server.zip
+    name: casparcg_server_windows
+
+  - path: casparcg_server_linux.zip
+    name: casparcg_server_linux
