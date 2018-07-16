@@ -5,3 +5,7 @@ resources
 .vscode
 CMakeFiles
 casparcg_server
+
+dist
+build
+src/cmake-build-*
