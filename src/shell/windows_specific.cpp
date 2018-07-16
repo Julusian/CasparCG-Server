@@ -53,7 +53,7 @@ LONG WINAPI UserUnhandledExceptionFilter(EXCEPTION_POINTERS* info)
     } catch (...) {
     }
 
-    return EXCEPTION_CONTINUE_EXECUTION;
+    return EXCEPTION_EXECUTE_HANDLER;
 }
 
 void setup_prerequisites()
@@ -80,6 +80,10 @@ void change_icon(const HICON hNewIcon)
 void setup_console_window()
 {
     auto hOut = GetStdHandle(STD_OUTPUT_HANDLE);
+    auto hIn = GetStdHandle(STD_INPUT_HANDLE);
+
+    // Disable Win 10 QuickEdit Mode.
+    SetConsoleMode(hIn, ENABLE_EXTENDED_FLAGS | ENABLE_INSERT_MODE);
 
     // Disable close button in console to avoid shutdown without cleanup.
     EnableMenuItem(GetSystemMenu(GetConsoleWindow(), FALSE), SC_CLOSE, MF_GRAYED);

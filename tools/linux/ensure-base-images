@@ -1,0 +1,10 @@
+#!/bin/bash
+
+source $(dirname "$0")/image-versions
+
+docker pull $IMAGE_BASE || docker build -t $IMAGE_BASE tools/cz/base
+docker pull $IMAGE_CEF || docker build -t $IMAGE_CEF tools/linux/cef
+docker pull $IMAGE_BOOST || docker build -t $IMAGE_BOOST tools/linux/boost
+docker pull $IMAGE_FFMPEG || docker build -t $IMAGE_FFMPEG tools/linux/ffmpeg
+
+# TODO - push images if auth variables are defined

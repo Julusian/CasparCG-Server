@@ -16,21 +16,11 @@
  * You should have received a copy of the GNU General Public License
  * along with CasparCG. If not, see <http://www.gnu.org/licenses/>.
  *
- * Author: Robert Nagy, ronag89@gmail.com
+ * Author: Julian Waller, git@julusian.co.uk
  */
 
 #pragma once
 
-#include <common/memory.h>
+#include <SFML/Window.hpp>
 
-#include <core/fwd.h>
-
-#include <string>
-#include <vector>
-
-namespace caspar { namespace ffmpeg {
-
-spl::shared_ptr<core::frame_producer> create_producer(const core::frame_producer_dependencies& dependencies,
-                                                      const std::vector<std::wstring>&         params);
-
-}} // namespace caspar::ffmpeg
+bool window_always_on_top(const sf::Window& window);
