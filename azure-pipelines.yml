@@ -1,0 +1,15 @@
+# C/C++ with GCC
+# Build your C/C++ project with GCC using make.
+# Add steps that publish test results, save build artifacts, deploy, and more:
+# https://docs.microsoft.com/vsts/pipelines/apps/c-cpp/gcc
+
+pool:
+  vmImage: 'Ubuntu 18.04'
+
+steps:
+- script: |
+    ./tools/linux/ensure-base-images
+    ./tools/linux/build-in-docker
+    ./tools/linux/extract-from-docker
+    zip -r casparcg_server_linux.zip casparcg_server/
+  displayName: 'build'
