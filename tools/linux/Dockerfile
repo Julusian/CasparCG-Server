@@ -1,7 +1,18 @@
-FROM casparcg/base:1.2.0 as build-casparcg
-	COPY --from=casparcg/boost:1.66-2 /opt/boost /opt/boost
-	COPY --from=casparcg/ffmpeg:master-acdea9e-2 /opt/ffmpeg /opt/ffmpeg
-	COPY --from=casparcg/cef:3.3239.1723-3 /opt/cef /opt/cef
+ARG IMAGE_BASE
+ARG IMAGE_BOOST
+ARG IMAGE_FFMPEG
+ARG IMAGE_CEF
+
+FROM ${IMAGE_BOOST} as boost
+FROM ${IMAGE_FFMPEG} as ffmpeg
+FROM ${IMAGE_CEF} as cef
+
+ARG PROC_COUNT=8
+
+FROM ${IMAGE_BASE} as build-casparcg
+	COPY --from=boost /opt/boost /opt/boost
+	COPY --from=ffmpeg /opt/ffmpeg /opt/ffmpeg
+	COPY --from=cef /opt/cef /opt/cef
 
 	RUN mkdir /source && mkdir /build && mkdir /install
 
@@ -15,7 +26,7 @@ FROM casparcg/base:1.2.0 as build-casparcg
 	ARG GIT_HASH
 
 	RUN cmake /source
-	RUN make -j8
+	RUN make -j $PROC_COUNT
 
 	# Find a better way to copy deps
 	RUN ln -s /build/staging /staging && \

@@ -1,0 +1,89 @@
+jobs:
+- job: linux
+  pool:
+    vmImage: 'ubuntu-16.04'
+  steps:
+  - checkout: self
+    clean: false
+    fetchDepth: 1
+    lfs: false
+  - bash: |
+      export PROC_COUNT=$(nproc)
+      ./tools/linux/ensure-base-images
+      ./tools/linux/build-in-docker
+      ./tools/linux/extract-from-docker
+    displayName: 'build'
+  - task: ArchiveFiles@2
+    inputs:
+      rootFolderOrFile: 'casparcg_server'
+      archiveType: 'zip' # Options: zip, 7z, tar, wim
+      archiveFile: 'artifacts/casparcg_server_linux.zip'
+    displayName: 'make archive'
+  - task: PublishPipelineArtifact@0
+    inputs:
+      artifactName: 'casparcg_server_linux'
+      targetPath: 'artifacts'
+    displayName: 'publish archive'
+- job: windows
+  pool:
+    vmImage: 'vs2017-win2016'
+  steps:
+  - task: CMake@1
+    inputs:
+      workingDirectory: "$(Build.BinariesDirectory)"
+      cmakeArgs: "-A x64 $(Build.SourcesDirectory)/src"
+    displayName: 'prepare build'
+  - task: NuGetCommand@2
+    inputs:
+      command: 'restore'
+      restoreSolution: '$(Build.BinariesDirectory)/CasparCG Server.sln'
+    displayName: 'nuget restore'
+  - task: VSBuild@1
+    inputs:
+      solution: '$(Build.BinariesDirectory)/CasparCG Server.sln'
+      vsVersion: 15.0
+      configuration: Release
+      msbuildArchitecture: 'x64'
+    displayName: 'build'
+  - script: |
+      cd $(Build.BinariesDirectory)
+      set SERVER_FOLDER=CasparCG Server
+      mkdir "%SERVER_FOLDER%"
+
+      echo "shell"
+      ls shell
+      echo "Rel"
+      ls shell\Release
+
+      del shell\*_debug.dll || goto :error
+      del shell\*-d-2.dll || goto :error
+
+      copy shell\*.dll "%SERVER_FOLDER%\server"
+      copy shell\Release\casparcg.exe "%SERVER_FOLDER%\server"
+      copy shell\casparcg.config "%SERVER_FOLDER%\server"
+      copy shell\*.ttf "%SERVER_FOLDER%\server"
+      copy shell\*.pak "%SERVER_FOLDER%\server"
+      copy shell\*.bin "%SERVER_FOLDER%\server"
+      copy shell\*.dat "%SERVER_FOLDER%\server"
+      xcopy shell\locales "%SERVER_FOLDER%\server\locales" /E /I /Y
+      xcopy shell\swiftshader "%SERVER_FOLDER%\server\swiftshader" /E /I /Y
+
+      copy $(Build.SourcesDirectory)\shell\casparcg_auto_restart.bat "%SERVER_FOLDER%\server"
+      xcopy $(Build.SourcesDirectory)\resources\windows\flash-template-host-files "%SERVER_FOLDER%" /E /I /Y || goto :error
+
+      echo Copying documentation...
+      copy $(Build.SourcesDirectory)\CHANGELOG.md "%SERVER_FOLDER%"
+      copy $(Build.SourcesDirectory)\LICENSE.md "%SERVER_FOLDER%"
+      copy $(Build.SourcesDirectory)\README.md "%SERVER_FOLDER%"
+    displayName: 'prepare archive'
+  - task: ArchiveFiles@2
+    inputs:
+      rootFolderOrFile: '$(Build.BinariesDirectory)\CasparCG Server'
+      archiveType: 'zip' # Options: zip, 7z, tar, wim
+      archiveFile: 'artifacts/casparcg_server_windows.zip'
+    displayName: 'make archive'
+  - task: PublishPipelineArtifact@0
+    inputs:
+      artifactName: 'casparcg_server_windows'
+      targetPath: 'artifacts'
+    displayName: 'publish archive'
