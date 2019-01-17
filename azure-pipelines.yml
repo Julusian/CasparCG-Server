@@ -1,5 +1,6 @@
 jobs:
-- job: linux
+- job: ubuntu_1804_docker
+  displayName: 'Ubuntu 18.04'
   pool:
     vmImage: 'ubuntu-16.04'
   steps:
@@ -12,19 +13,17 @@ jobs:
       ./tools/linux/ensure-base-images
       ./tools/linux/build-in-docker
       ./tools/linux/extract-from-docker
-    displayName: 'build'
-  - task: ArchiveFiles@2
-    inputs:
-      rootFolderOrFile: 'casparcg_server'
-      archiveType: 'zip' # Options: zip, 7z, tar, wim
-      archiveFile: 'artifacts/casparcg_server_linux.zip'
-    displayName: 'make archive'
-  - task: PublishPipelineArtifact@0
-    inputs:
-      artifactName: 'casparcg_server_linux'
-      targetPath: 'artifacts'
-    displayName: 'publish archive'
+    displayName: 'build in docker'
+#   - task: ArchiveFiles@2
+#     inputs:
+#       rootFolderOrFile: 'casparcg_server'
+#       archiveType: 'zip' # Options: zip, 7z, tar, wim
+#       archiveFile: 'artifacts/casparcg_server_linux.zip'
+#     displayName: 'make archive'
+# TODO - publish zip to ftp/similar
+
 - job: windows
+  displayName: 'Windows VS2017'
   pool:
     vmImage: 'vs2017-win2016'
   steps:
@@ -48,42 +47,13 @@ jobs:
   - script: |
       cd $(Build.BinariesDirectory)
       set SERVER_FOLDER=CasparCG Server
-      mkdir "%SERVER_FOLDER%"
 
-      echo "shell"
-      ls shell
-      echo "Rel"
-      ls shell\Release
-
-      del shell\*_debug.dll || goto :error
-      del shell\*-d-2.dll || goto :error
-
-      copy shell\*.dll "%SERVER_FOLDER%\server"
-      copy shell\Release\casparcg.exe "%SERVER_FOLDER%\server"
-      copy shell\casparcg.config "%SERVER_FOLDER%\server"
-      copy shell\*.ttf "%SERVER_FOLDER%\server"
-      copy shell\*.pak "%SERVER_FOLDER%\server"
-      copy shell\*.bin "%SERVER_FOLDER%\server"
-      copy shell\*.dat "%SERVER_FOLDER%\server"
-      xcopy shell\locales "%SERVER_FOLDER%\server\locales" /E /I /Y
-      xcopy shell\swiftshader "%SERVER_FOLDER%\server\swiftshader" /E /I /Y
-
-      copy $(Build.SourcesDirectory)\shell\casparcg_auto_restart.bat "%SERVER_FOLDER%\server"
-      xcopy $(Build.SourcesDirectory)\resources\windows\flash-template-host-files "%SERVER_FOLDER%" /E /I /Y || goto :error
-
-      echo Copying documentation...
-      copy $(Build.SourcesDirectory)\CHANGELOG.md "%SERVER_FOLDER%"
-      copy $(Build.SourcesDirectory)\LICENSE.md "%SERVER_FOLDER%"
-      copy $(Build.SourcesDirectory)\README.md "%SERVER_FOLDER%"
+      $(Build.SourcesDirectory)\tools\windows\package.bat $(Build.SourcesDirectory)
     displayName: 'prepare archive'
-  - task: ArchiveFiles@2
-    inputs:
-      rootFolderOrFile: '$(Build.BinariesDirectory)\CasparCG Server'
-      archiveType: 'zip' # Options: zip, 7z, tar, wim
-      archiveFile: 'artifacts/casparcg_server_windows.zip'
-    displayName: 'make archive'
-  - task: PublishPipelineArtifact@0
-    inputs:
-      artifactName: 'casparcg_server_windows'
-      targetPath: 'artifacts'
-    displayName: 'publish archive'
+#   - task: ArchiveFiles@2
+#     inputs:
+#       rootFolderOrFile: '$(Build.BinariesDirectory)\CasparCG Server'
+#       archiveType: 'zip' # Options: zip, 7z, tar, wim
+#       archiveFile: 'artifacts/casparcg_server_windows.zip'
+#     displayName: 'make archive'
+# TODO - publish zip to ftp/similar
