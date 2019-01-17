@@ -1,6 +1,8 @@
 CasparCG Server
 ===============
 
+[![Build Status](https://dev.azure.com/julusian/casparcg/_apis/build/status/Julusian.CasparCG-Server?branchName=azure-pipelines)](https://dev.azure.com/julusian/casparcg/_build/latest?definitionId=1?branchName=azure-pipelines)
+
 Thank you for your interest in CasparCG Server, a professional software used to
 play out and record professional graphics, audio and video to multiple outputs.
 CasparCG Server has been in 24/7 broadcast production since 2006.
@@ -43,7 +45,7 @@ INSTALLATION ON WINDOWS
 
 INSTALLATION ON LINUX
 ---------------------
-   
+
 RESOLVING COMMON ISSUES ON LINUX
 --------------------------------
 
@@ -101,7 +103,7 @@ CONFIGURATION
 1. Configure the server by editing the self-documented "casparcg.config" file in
    a text editor.
 
-2. 
+2.
    1. Windows: start `casparcg_auto_restart.bat`, or `casparcg.exe` and `scanner.exe` separately.
    1. Linux: start the `run.sh` program.
 

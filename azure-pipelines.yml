@@ -12,7 +12,7 @@ jobs:
       export PROC_COUNT=$(nproc)
       ./tools/linux/ensure-base-images
       ./tools/linux/build-in-docker
-      ./tools/linux/extract-from-docker
+    #   ./tools/linux/extract-from-docker
     displayName: 'build in docker'
 #   - task: ArchiveFiles@2
 #     inputs:
@@ -27,6 +27,10 @@ jobs:
   pool:
     vmImage: 'vs2017-win2016'
   steps:
+  - checkout: self
+    clean: false
+    fetchDepth: 1
+    lfs: false
   - task: CMake@1
     inputs:
       workingDirectory: "$(Build.BinariesDirectory)"
@@ -44,12 +48,12 @@ jobs:
       configuration: Release
       msbuildArchitecture: 'x64'
     displayName: 'build'
-  - script: |
-      cd $(Build.BinariesDirectory)
-      set SERVER_FOLDER=CasparCG Server
+#   - script: |
+#       cd $(Build.BinariesDirectory)
+#       set SERVER_FOLDER=CasparCG Server
 
-      $(Build.SourcesDirectory)\tools\windows\package.bat $(Build.SourcesDirectory)
-    displayName: 'prepare archive'
+#       $(Build.SourcesDirectory)\tools\windows\package.bat $(Build.SourcesDirectory)
+#     displayName: 'prepare archive'
 #   - task: ArchiveFiles@2
 #     inputs:
 #       rootFolderOrFile: '$(Build.BinariesDirectory)\CasparCG Server'
