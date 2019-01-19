@@ -44,22 +44,22 @@ class cg_proxy
                              const std::wstring& template_name,
                              bool                play_on_load,
                              const std::wstring& start_from_label = L"",
-                             const std::wstring& data             = L"")            = 0;
-    virtual void         remove(int layer)                              = 0;
-    virtual void         play(int layer)                                = 0;
-    virtual void         stop(int layer, unsigned int mix_out_duration) = 0;
-    virtual void         next(int layer)                                = 0;
-    virtual void         update(int layer, const std::wstring& data)    = 0;
-    virtual std::wstring invoke(int layer, const std::wstring& label)   = 0;
+                             const std::wstring& data             = L"")          = 0;
+    virtual void         remove(int layer)                            = 0;
+    virtual void         play(int layer)                              = 0;
+    virtual void         stop(int layer)                              = 0;
+    virtual void         next(int layer)                              = 0;
+    virtual void         update(int layer, const std::wstring& data)  = 0;
+    virtual std::wstring invoke(int layer, const std::wstring& label) = 0;
 
     static const spl::shared_ptr<cg_proxy>& empty();
 };
 
-typedef std::function<spl::shared_ptr<cg_proxy>(const spl::shared_ptr<frame_producer>& producer)> cg_proxy_factory;
-typedef std::function<spl::shared_ptr<frame_producer>(const frame_producer_dependencies& dependencies,
-                                                      const std::wstring&                filename)>
-                                                                 cg_producer_factory;
-typedef std::function<std::string(const std::wstring& filename)> meta_info_extractor;
+using cg_proxy_factory = std::function<spl::shared_ptr<cg_proxy>(const spl::shared_ptr<frame_producer>& producer)>;
+using cg_producer_factory =
+    std::function<spl::shared_ptr<frame_producer>(const frame_producer_dependencies& dependencies,
+                                                  const std::wstring&                filename)>;
+using meta_info_extractor = std::function<std::string(const std::wstring& filename)>;
 
 class cg_producer_registry : boost::noncopyable
 {

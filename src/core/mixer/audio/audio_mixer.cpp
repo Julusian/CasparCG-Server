@@ -30,7 +30,6 @@
 #include <common/diagnostics/graph.h>
 
 #include <boost/container/flat_map.hpp>
-#include <boost/lexical_cast.hpp>
 #include <boost/range/adaptors.hpp>
 #include <boost/range/algorithm.hpp>
 
@@ -49,7 +48,7 @@ struct audio_item
     array<const int32_t> samples;
 };
 
-typedef std::vector<double> audio_buffer_ps;
+using audio_buffer_ps = std::vector<double>;
 
 struct audio_mixer::impl : boost::noncopyable
 {
