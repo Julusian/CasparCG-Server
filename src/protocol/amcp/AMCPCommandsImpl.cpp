@@ -46,24 +46,20 @@
 #include <core/mixer/mixer.h>
 #include <core/producer/cg_proxy.h>
 #include <core/producer/frame_producer.h>
-#include <core/producer/layer.h>
 #include <core/producer/stage.h>
 #include <core/producer/transition/sting_producer.h>
 #include <core/producer/transition/transition_producer.h>
 #include <core/video_format.h>
 
 #include <algorithm>
-#include <cctype>
 #include <fstream>
 #include <future>
-#include <locale>
 #include <memory>
 
 #include <boost/algorithm/string.hpp>
 #include <boost/algorithm/string/regex.hpp>
 #include <boost/archive/iterators/base64_from_binary.hpp>
 #include <boost/archive/iterators/insert_linebreaks.hpp>
-#include <boost/archive/iterators/transform_width.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/fstream.hpp>
@@ -557,12 +553,12 @@ std::wstring cg_add_command(command_context& ctx)
         ++dataIndex;
 
         if (ctx.parameters.at(3).length() > 0) // read play-on-load-flag
-            bDoStart = (ctx.parameters.at(3).at(0) == L'1') ? true : false;
+            bDoStart = ctx.parameters.at(3).at(0) == L'1' ? true : false;
     } else { // read play-on-load-flag
-        bDoStart = (ctx.parameters.at(2).at(0) == L'1') ? true : false;
+        bDoStart = ctx.parameters.at(2).at(0) == L'1' ? true : false;
     }
 
-    const wchar_t* pDataString = 0;
+    const wchar_t* pDataString = nullptr;
     std::wstring   dataFromFile;
     if (ctx.parameters.size() > dataIndex) { // read data
         const std::wstring& dataString = ctx.parameters.at(dataIndex);
@@ -593,7 +589,7 @@ std::wstring cg_add_command(command_context& ctx)
     if (proxy == core::cg_proxy::empty())
         CASPAR_THROW_EXCEPTION(file_not_found() << msg_info(L"Could not find template " + filename));
     else
-        proxy->add(layer, filename, bDoStart, label, (pDataString != 0) ? pDataString : L"");
+        proxy->add(layer, filename, bDoStart, label, pDataString != nullptr ? pDataString : L"");
 
     return L"202 CG OK\r\n";
 }
@@ -622,7 +618,7 @@ spl::shared_ptr<core::cg_proxy> get_expected_cg_proxy(command_context& ctx)
 std::wstring cg_stop_command(command_context& ctx)
 {
     int layer = boost::lexical_cast<int>(ctx.parameters.at(0));
-    get_expected_cg_proxy(ctx)->stop(layer, 0);
+    get_expected_cg_proxy(ctx)->stop(layer);
 
     return L"202 CG OK\r\n";
 }
@@ -704,7 +700,7 @@ class transforms_applier
     bool                                  defer_;
 
   public:
-    transforms_applier(command_context& ctx)
+    explicit transforms_applier(command_context& ctx)
         : ctx_(ctx)
     {
         defer_ = !ctx.parameters.empty() && boost::iequals(ctx.parameters.back(), L"DEFER");
@@ -777,15 +773,11 @@ std::wstring mixer_chroma_command(command_context& ctx)
 {
     if (ctx.parameters.empty()) {
         auto chroma = get_current_transform(ctx).image_transform.chroma;
-        return L"201 MIXER OK\r\n" + std::wstring(chroma.enable ? L"1 " : L"0 ") +
-               boost::lexical_cast<std::wstring>(chroma.target_hue) + L" " +
-               boost::lexical_cast<std::wstring>(chroma.hue_width) + L" " +
-               boost::lexical_cast<std::wstring>(chroma.min_saturation) + L" " +
-               boost::lexical_cast<std::wstring>(chroma.min_brightness) + L" " +
-               boost::lexical_cast<std::wstring>(chroma.softness) + L" " +
-               boost::lexical_cast<std::wstring>(chroma.spill_suppress) + L" " +
-               boost::lexical_cast<std::wstring>(chroma.spill_suppress_saturation) + L" " +
-               std::wstring(chroma.show_mask ? L"1" : L"0") + L"\r\n";
+        return L"201 MIXER OK\r\n" + std::wstring(chroma.enable ? L"1 " : L"0 ") + std::to_wstring(chroma.target_hue) +
+               L" " + std::to_wstring(chroma.hue_width) + L" " + std::to_wstring(chroma.min_saturation) + L" " +
+               std::to_wstring(chroma.min_brightness) + L" " + std::to_wstring(chroma.softness) + L" " +
+               std::to_wstring(chroma.spill_suppress) + L" " + std::to_wstring(chroma.spill_suppress_saturation) +
+               L" " + std::wstring(chroma.show_mask ? L"1" : L"0") + L"\r\n";
     }
 
     transforms_applier transforms(ctx);
@@ -925,11 +917,9 @@ std::wstring mixer_levels_command(command_context& ctx)
 {
     if (ctx.parameters.empty()) {
         auto levels = get_current_transform(ctx).image_transform.levels;
-        return L"201 MIXER OK\r\n" + boost::lexical_cast<std::wstring>(levels.min_input) + L" " +
-               boost::lexical_cast<std::wstring>(levels.max_input) + L" " +
-               boost::lexical_cast<std::wstring>(levels.gamma) + L" " +
-               boost::lexical_cast<std::wstring>(levels.min_output) + L" " +
-               boost::lexical_cast<std::wstring>(levels.max_output) + L"\r\n";
+        return L"201 MIXER OK\r\n" + std::to_wstring(levels.min_input) + L" " + std::to_wstring(levels.max_input) +
+               L" " + std::to_wstring(levels.gamma) + L" " + std::to_wstring(levels.min_output) + L" " +
+               std::to_wstring(levels.max_output) + L"\r\n";
     }
 
     transforms_applier transforms(ctx);
@@ -960,9 +950,8 @@ std::wstring mixer_fill_command(command_context& ctx)
         auto transform   = get_current_transform(ctx).image_transform;
         auto translation = transform.fill_translation;
         auto scale       = transform.fill_scale;
-        return L"201 MIXER OK\r\n" + boost::lexical_cast<std::wstring>(translation[0]) + L" " +
-               boost::lexical_cast<std::wstring>(translation[1]) + L" " + boost::lexical_cast<std::wstring>(scale[0]) +
-               L" " + boost::lexical_cast<std::wstring>(scale[1]) + L"\r\n";
+        return L"201 MIXER OK\r\n" + std::to_wstring(translation[0]) + L" " + std::to_wstring(translation[1]) + L" " +
+               std::to_wstring(scale[0]) + L" " + std::to_wstring(scale[1]) + L"\r\n";
     }
 
     transforms_applier transforms(ctx);
@@ -995,9 +984,8 @@ std::wstring mixer_clip_command(command_context& ctx)
         auto translation = transform.clip_translation;
         auto scale       = transform.clip_scale;
 
-        return L"201 MIXER OK\r\n" + boost::lexical_cast<std::wstring>(translation[0]) + L" " +
-               boost::lexical_cast<std::wstring>(translation[1]) + L" " + boost::lexical_cast<std::wstring>(scale[0]) +
-               L" " + boost::lexical_cast<std::wstring>(scale[1]) + L"\r\n";
+        return L"201 MIXER OK\r\n" + std::to_wstring(translation[0]) + L" " + std::to_wstring(translation[1]) + L" " +
+               std::to_wstring(scale[0]) + L" " + std::to_wstring(scale[1]) + L"\r\n";
     }
 
     transforms_applier transforms(ctx);
@@ -1028,8 +1016,7 @@ std::wstring mixer_anchor_command(command_context& ctx)
     if (ctx.parameters.empty()) {
         auto transform = get_current_transform(ctx).image_transform;
         auto anchor    = transform.anchor;
-        return L"201 MIXER OK\r\n" + boost::lexical_cast<std::wstring>(anchor[0]) + L" " +
-               boost::lexical_cast<std::wstring>(anchor[1]) + L"\r\n";
+        return L"201 MIXER OK\r\n" + std::to_wstring(anchor[0]) + L" " + std::to_wstring(anchor[1]) + L"\r\n";
     }
 
     transforms_applier transforms(ctx);
@@ -1055,9 +1042,8 @@ std::wstring mixer_crop_command(command_context& ctx)
 {
     if (ctx.parameters.empty()) {
         auto crop = get_current_transform(ctx).image_transform.crop;
-        return L"201 MIXER OK\r\n" + boost::lexical_cast<std::wstring>(crop.ul[0]) + L" " +
-               boost::lexical_cast<std::wstring>(crop.ul[1]) + L" " + boost::lexical_cast<std::wstring>(crop.lr[0]) +
-               L" " + boost::lexical_cast<std::wstring>(crop.lr[1]) + L"\r\n";
+        return L"201 MIXER OK\r\n" + std::to_wstring(crop.ul[0]) + L" " + std::to_wstring(crop.ul[1]) + L" " +
+               std::to_wstring(crop.lr[0]) + L" " + std::to_wstring(crop.lr[1]) + L"\r\n";
     }
 
     transforms_applier transforms(ctx);
@@ -1097,14 +1083,10 @@ std::wstring mixer_perspective_command(command_context& ctx)
 {
     if (ctx.parameters.empty()) {
         auto perspective = get_current_transform(ctx).image_transform.perspective;
-        return L"201 MIXER OK\r\n" + boost::lexical_cast<std::wstring>(perspective.ul[0]) + L" " +
-               boost::lexical_cast<std::wstring>(perspective.ul[1]) + L" " +
-               boost::lexical_cast<std::wstring>(perspective.ur[0]) + L" " +
-               boost::lexical_cast<std::wstring>(perspective.ur[1]) + L" " +
-               boost::lexical_cast<std::wstring>(perspective.lr[0]) + L" " +
-               boost::lexical_cast<std::wstring>(perspective.lr[1]) + L" " +
-               boost::lexical_cast<std::wstring>(perspective.ll[0]) + L" " +
-               boost::lexical_cast<std::wstring>(perspective.ll[1]) + L"\r\n";
+        return L"201 MIXER OK\r\n" + std::to_wstring(perspective.ul[0]) + L" " + std::to_wstring(perspective.ul[1]) +
+               L" " + std::to_wstring(perspective.ur[0]) + L" " + std::to_wstring(perspective.ur[1]) + L" " +
+               std::to_wstring(perspective.lr[0]) + L" " + std::to_wstring(perspective.lr[1]) + L" " +
+               std::to_wstring(perspective.ll[0]) + L" " + std::to_wstring(perspective.ll[1]) + L"\r\n";
     }
 
     transforms_applier transforms(ctx);
@@ -1150,7 +1132,7 @@ std::wstring mixer_mastervolume_command(command_context& ctx)
 {
     if (ctx.parameters.empty()) {
         auto volume = ctx.channel.channel->mixer().get_master_volume();
-        return L"201 MIXER OK\r\n" + boost::lexical_cast<std::wstring>(volume) + L"\r\n";
+        return L"201 MIXER OK\r\n" + std::to_wstring(volume) + L"\r\n";
     }
 
     float master_volume = boost::lexical_cast<float>(ctx.parameters.at(0));
@@ -1231,8 +1213,7 @@ std::wstring channel_grid_command(command_context& ctx)
         if (channel.channel != self.channel) {
             core::diagnostics::call_context::for_thread().layer = index;
             auto producer                                       = ctx.producer_registry->create_producer(
-                get_producer_dependencies(self.channel, ctx),
-                L"route://" + boost::lexical_cast<std::wstring>(channel.channel->index()));
+                get_producer_dependencies(self.channel, ctx), L"route://" + std::to_wstring(channel.channel->index()));
             self.channel->stage().load(index, producer, false);
             self.channel->stage().play(index);
             index++;
@@ -1245,7 +1226,7 @@ std::wstring channel_grid_command(command_context& ctx)
     ctx.channel_index = self.channel->index();
     ctx.channel       = self;
     ctx.parameters.clear();
-    ctx.parameters.push_back(boost::lexical_cast<std::wstring>(square_side_length));
+    ctx.parameters.push_back(std::to_wstring(square_side_length));
     mixer_grid_command(ctx);
 
     return L"202 CHANNEL_GRID OK\r\n";
@@ -1307,8 +1288,8 @@ struct param_visitor : public boost::static_visitor<void>
 
     template <typename T>
     param_visitor(std::string path, T& o)
-        : o(o)
-        , path(u16(path))
+        : path(u16(path))
+        , o(o)
     {
     }
 
@@ -1333,10 +1314,6 @@ struct param_visitor : public boost::static_visitor<void>
 
 std::wstring info_channel_command(command_context& ctx)
 {
-    std::wstringstream replyString;
-    // This is needed for backwards compatibility with old clients
-    replyString << L"201 INFO OK\r\n";
-
     pt::wptree info;
     pt::wptree channel_info;
 
@@ -1353,6 +1330,10 @@ std::wstring info_channel_command(command_context& ctx)
     }
 
     info.add_child(L"channel", channel_info);
+
+    std::wstringstream replyString;
+    // This is needed for backwards compatibility with old clients
+    replyString << L"201 INFO OK\r\n";
 
     pt::xml_writer_settings<std::wstring> w(' ', 3);
     pt::xml_parser::write_xml(replyString, info, w);
@@ -1373,6 +1354,42 @@ std::wstring info_command(command_context& ctx)
     replyString << L"\r\n";
     return replyString.str();
 }
+
+
+std::wstring info_config_command(command_context& ctx)
+{
+    std::wstringstream replyString;
+    // This is needed for backwards compatibility with old clients
+    replyString << L"201 INFO CONFIG OK\r\n";
+
+    pt::xml_writer_settings<std::wstring> w(' ', 3);
+    pt::xml_parser::write_xml(replyString, caspar::env::properties(), w);
+
+    replyString << L"\r\n";
+    return replyString.str();
+}
+
+std::wstring info_paths_command(command_context& ctx)
+{
+	boost::property_tree::wptree info;
+
+	info.add(L"paths.media-path",		caspar::env::media_folder());
+	info.add(L"paths.log-path",			caspar::env::log_folder());
+	info.add(L"paths.data-path",			caspar::env::data_folder());
+	info.add(L"paths.template-path",		caspar::env::template_folder());
+	info.add(L"paths.initial-path",		caspar::env::initial_folder() + L"/");
+
+    std::wstringstream replyString;
+    // This is needed for backwards compatibility with old clients
+    replyString << L"201 INFO PATHS OK\r\n";
+
+    pt::xml_writer_settings<std::wstring> w(' ', 3);
+    pt::xml_parser::write_xml(replyString, info, w);
+
+    replyString << L"\r\n";
+    return replyString.str();
+}
+
 
 std::wstring diag_command(command_context& ctx)
 {
@@ -1415,10 +1432,12 @@ std::wstring lock_command(command_context& ctx)
             return L"503 LOCK ACQUIRE FAILED\r\n";
 
         return L"202 LOCK ACQUIRE OK\r\n";
-    } else if (command == L"RELEASE") {
+    }
+    if (command == L"RELEASE") {
         lock->release_lock(ctx.client);
         return L"202 LOCK RELEASE OK\r\n";
-    } else if (command == L"CLEAR") {
+    }
+    if (command == L"CLEAR") {
         std::wstring override_phrase = env::properties().get(L"configuration.lock-clear-phrase", L"");
         std::wstring client_override_phrase;
 
@@ -1507,6 +1526,8 @@ void register_commands(amcp_command_repository& repo)
     repo.register_command(L"Query Commands", L"RESTART", restart_command, 0);
     repo.register_channel_command(L"Query Commands", L"INFO", info_channel_command, 0);
     repo.register_command(L"Query Commands", L"INFO", info_command, 0);
+    repo.register_command(L"Query Commands", L"INFO CONFIG", info_config_command, 0);
+    repo.register_command(L"Query Commands", L"INFO PATHS", info_paths_command, 0);
 }
 
 }}} // namespace caspar::protocol::amcp

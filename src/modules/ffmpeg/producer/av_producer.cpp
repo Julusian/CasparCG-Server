@@ -7,7 +7,6 @@
 
 #include <boost/exception/exception.hpp>
 #include <boost/format.hpp>
-#include <boost/lexical_cast.hpp>
 #include <boost/property_tree/ptree.hpp>
 #include <boost/range/algorithm/rotate.hpp>
 #include <boost/rational.hpp>
@@ -23,7 +22,6 @@
 #include <common/timer.h>
 
 #include <core/frame/draw_frame.h>
-#include <core/frame/frame.h>
 #include <core/frame/frame_factory.h>
 #include <core/monitor/monitor.h>
 
@@ -53,7 +51,6 @@ extern "C" {
 #include <algorithm>
 #include <atomic>
 #include <deque>
-#include <exception>
 #include <iomanip>
 #include <memory>
 #include <queue>
@@ -88,7 +85,7 @@ struct Decoder
 
     Decoder() = default;
 
-    Decoder(AVStream* stream)
+    explicit Decoder(AVStream* stream)
         : st(stream)
     {
         const auto codec = avcodec_find_decoder(stream->codecpar->codec_id);
@@ -169,7 +166,7 @@ struct Decoder
                 if (ctx->codec_type == AVMEDIA_TYPE_VIDEO) {
                     const auto ticks =
                         av_stream_get_parser(st) ? av_stream_get_parser(st)->repeat_pict + 1 : ctx->ticks_per_frame;
-                    duration_pts = (static_cast<int64_t>(AV_TIME_BASE) * ctx->framerate.den * ticks) /
+                    duration_pts = static_cast<int64_t>(AV_TIME_BASE) * ctx->framerate.den * ticks /
                                    ctx->framerate.num / ctx->ticks_per_frame;
                     duration_pts = av_rescale_q(duration_pts, {1, AV_TIME_BASE}, st->time_base);
                 } else if (ctx->codec_type == AVMEDIA_TYPE_AUDIO) {
@@ -484,22 +481,22 @@ struct Filter
 
         if (ret == AVERROR(EAGAIN)) {
             return false;
-        } else if (ret == AVERROR_EOF) {
+        }
+        if (ret == AVERROR_EOF) {
             eof   = true;
             frame = nullptr;
             return true;
-        } else {
-            FF_RET(ret, "av_buffersink_get_frame");
-            frame = std::move(av_frame);
-            return true;
         }
+        FF_RET(ret, "av_buffersink_get_frame");
+        frame = std::move(av_frame);
+        return true;
     }
 };
 
 struct AVProducer::Impl
 {
     caspar::core::monitor::state state_;
-    mutable boost::mutex state_mutex_;
+    mutable boost::mutex         state_mutex_;
 
     spl::shared_ptr<diagnostics::graph> graph_;
 
@@ -555,14 +552,14 @@ struct AVProducer::Impl
         : frame_factory_(frame_factory)
         , format_desc_(format_desc)
         , format_tb_({format_desc.duration, format_desc.time_scale})
-        , path_(path)
         , name_(name)
+        , path_(path)
         , input_(path, graph_)
         , start_(start ? av_rescale_q(*start, format_tb_, TIME_BASE_Q) : AV_NOPTS_VALUE)
         , duration_(duration ? av_rescale_q(*duration, format_tb_, TIME_BASE_Q) : AV_NOPTS_VALUE)
         , loop_(loop)
-        , vfilter_(vfilter)
         , afilter_(afilter)
+        , vfilter_(vfilter)
     {
         diagnostics::register_graph(graph_);
         graph_->set_color("underflow", diagnostics::color(0.6f, 0.3f, 0.9f));
@@ -600,9 +597,9 @@ struct AVProducer::Impl
         input_.reset();
 
         for (auto n = 0UL; n < input_->nb_streams; ++n) {
-            auto st        = input_->streams[n];
-            auto framerate = av_guess_frame_rate(nullptr, st, nullptr);
-            state_["file/streams/" + boost::lexical_cast<std::string>(n) + "/fps"] = {framerate.num, framerate.den};
+            auto st                                              = input_->streams[n];
+            auto framerate                                       = av_guess_frame_rate(nullptr, st, nullptr);
+            state_["file/streams/" + std::to_string(n) + "/fps"] = {framerate.num, framerate.den};
         }
 
         if (input_duration_ == AV_NOPTS_VALUE) {
@@ -909,13 +906,7 @@ struct AVProducer::Impl
                     return true;
                 }
 
-                if (it->second.input.size() >= 256) {
-                    if (min.first != -1) {
-                        decoders_[min.first].input.push(nullptr);
-                        return true;
-                    }
-                    return false;
-                }
+                // TODO (fix): limit it->second.input.size()?
 
                 result = true;
 

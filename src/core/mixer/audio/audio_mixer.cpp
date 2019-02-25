@@ -30,12 +30,9 @@
 #include <common/diagnostics/graph.h>
 
 #include <boost/container/flat_map.hpp>
-#include <boost/lexical_cast.hpp>
-#include <boost/range/adaptors.hpp>
 #include <boost/range/algorithm.hpp>
 
 #include <atomic>
-#include <map>
 #include <stack>
 #include <vector>
 
@@ -49,9 +46,9 @@ struct audio_item
     array<const int32_t> samples;
 };
 
-typedef std::vector<double> audio_buffer_ps;
+using audio_buffer_ps = std::vector<double>;
 
-struct audio_mixer::impl : boost::noncopyable
+struct audio_mixer::impl
 {
     monitor::state                      state_;
     std::stack<core::audio_transform>   transform_stack_;
@@ -59,7 +56,9 @@ struct audio_mixer::impl : boost::noncopyable
     std::atomic<float>                  master_volume_{1.0f};
     spl::shared_ptr<diagnostics::graph> graph_;
 
-  public:
+    impl(const impl&) = delete;
+    impl& operator=(const impl&) = delete;
+
     impl(spl::shared_ptr<diagnostics::graph> graph)
         : graph_(std::move(graph))
     {

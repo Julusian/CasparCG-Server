@@ -41,15 +41,11 @@
 
 #include <common/env.h>
 #include <common/except.h>
-#include <common/gl/gl_check.h>
 #include <common/log.h>
 
-#include <boost/algorithm/string/case_conv.hpp>
-#include <boost/algorithm/string/classification.hpp>
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/algorithm/string/split.hpp>
 #include <boost/filesystem.hpp>
-#include <boost/lexical_cast.hpp>
 #include <boost/locale.hpp>
 #include <boost/property_tree/detail/file_parser_error.hpp>
 #include <boost/property_tree/xml_parser.hpp>
@@ -57,7 +53,6 @@
 
 #include <atomic>
 #include <future>
-#include <set>
 
 #include <clocale>
 #include <csignal>
@@ -103,7 +98,7 @@ auto run(const std::wstring& config_file_name, std::atomic<bool>& should_wait_fo
     std::wstringstream                                      str;
     boost::property_tree::xml_writer_settings<std::wstring> w(' ', 3);
     boost::property_tree::write_xml(str, env::properties(), w);
-    CASPAR_LOG(info) << boost::filesystem::canonical(config_file_name)
+    CASPAR_LOG(info) << boost::filesystem::absolute(config_file_name).lexically_normal()
                      << L":\n-----------------------------------------\n"
                      << str.str() << L"-----------------------------------------";
 

@@ -40,7 +40,6 @@
 #include <core/producer/frame_producer.h>
 
 #include <common/array.h>
-#include <common/base64.h>
 #include <common/env.h>
 #include <common/log.h>
 #include <common/os/filesystem.h>
@@ -52,6 +51,7 @@
 
 #include <algorithm>
 #include <set>
+#include <utility>
 
 namespace caspar { namespace image {
 
@@ -63,10 +63,8 @@ struct image_producer : public core::frame_producer
     const uint32_t                             length_ = 0;
     core::draw_frame                           frame_;
 
-    image_producer(const spl::shared_ptr<core::frame_factory>& frame_factory,
-                   const std::wstring&                         description,
-                   uint32_t                                    length)
-        : description_(description)
+    image_producer(const spl::shared_ptr<core::frame_factory>& frame_factory, std::wstring description, uint32_t length)
+        : description_(std::move(description))
         , frame_factory_(frame_factory)
         , length_(length)
     {
@@ -127,8 +125,8 @@ class ieq
     std::wstring test_;
 
   public:
-    ieq(const std::wstring& test)
-        : test_(test)
+    explicit ieq(std::wstring test)
+        : test_(std::move(test))
     {
     }
 

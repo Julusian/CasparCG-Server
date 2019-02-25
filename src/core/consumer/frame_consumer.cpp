@@ -31,9 +31,6 @@
 
 #include <boost/circular_buffer.hpp>
 #include <boost/property_tree/ptree.hpp>
-#include <boost/range/adaptors.hpp>
-#include <boost/range/algorithm.hpp>
-#include <boost/timer.hpp>
 
 #include <future>
 #include <map>
@@ -110,6 +107,7 @@ class destroy_consumer_proxy : public frame_consumer
             }
 
             pointer_guard.reset();
+            counter--;
         })
             .detach();
     }

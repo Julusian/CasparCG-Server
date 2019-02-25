@@ -29,28 +29,24 @@
 #include "frame/draw_frame.h"
 #include "frame/frame.h"
 #include "frame/frame_factory.h"
-#include "frame/frame_transform.h"
 #include "mixer/mixer.h"
 #include "producer/stage.h"
 
 #include <common/diagnostics/graph.h>
-#include <common/env.h>
 #include <common/executor.h>
-#include <common/future.h>
 #include <common/timer.h>
 
 #include <core/diagnostics/call_context.h>
 #include <core/mixer/image/image_mixer.h>
 
-#include <boost/lexical_cast.hpp>
-
 #include <mutex>
 #include <string>
 #include <unordered_map>
+#include <utility>
 
 namespace caspar { namespace core {
 
-bool operator<(const route_id& a, const route_id& b) { return (a.mode + (a.index << 2)) < (b.mode + (b.index << 2)); }
+bool operator<(const route_id& a, const route_id& b) { return a.mode + (a.index << 2) < b.mode + (b.index << 2); }
 
 struct video_channel::impl final
 {
@@ -93,7 +89,7 @@ struct video_channel::impl final
         , image_mixer_(std::move(image_mixer))
         , mixer_(index, graph_, image_mixer_)
         , stage_(index, graph_)
-        , tick_(tick)
+        , tick_(std::move(tick))
     {
         graph_->set_color("produce-time", caspar::diagnostics::color(0.0f, 1.0f, 0.0f));
         graph_->set_color("mix-time", caspar::diagnostics::color(1.0f, 0.0f, 0.9f, 0.8f));
@@ -109,7 +105,7 @@ struct video_channel::impl final
 #ifdef WIN32
             SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);
 #endif
-            set_thread_name(L"channel-" + boost::lexical_cast<std::wstring>(index_));
+            set_thread_name(L"channel-" + std::to_wstring(index_));
 
             while (!abort_request_) {
                 try {
@@ -228,9 +224,9 @@ struct video_channel::impl final
         if (!route) {
             route              = std::make_shared<core::route>();
             route->format_desc = format_desc_;
-            route->name        = boost::lexical_cast<std::wstring>(index_);
+            route->name        = std::to_wstring(index_);
             if (index != -1) {
-                route->name += L"/" + boost::lexical_cast<std::wstring>(index);
+                route->name += L"/" + std::to_wstring(index);
             }
             if (mode == route_mode::background) {
                 route->name += L"/background";
@@ -259,7 +255,7 @@ struct video_channel::impl final
 
     std::wstring print() const
     {
-        return L"video_channel[" + boost::lexical_cast<std::wstring>(index_) + L"|" + video_format_desc().name + L"]";
+        return L"video_channel[" + std::to_wstring(index_) + L"|" + video_format_desc().name + L"]";
     }
 
     int index() const { return index_; }
@@ -269,7 +265,7 @@ video_channel::video_channel(int                                       index,
                              const core::video_format_desc&            format_desc,
                              std::unique_ptr<image_mixer>              image_mixer,
                              std::function<void(core::monitor::state)> tick)
-    : impl_(new impl(index, format_desc, std::move(image_mixer), tick))
+    : impl_(new impl(index, format_desc, std::move(image_mixer), std::move(tick)))
 {
 }
 video_channel::~video_channel() {}

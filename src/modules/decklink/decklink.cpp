@@ -30,8 +30,6 @@
 #include <core/consumer/frame_consumer.h>
 #include <core/producer/frame_producer.h>
 
-#include <boost/property_tree/ptree.hpp>
-
 #include "decklink_api.h"
 
 namespace caspar { namespace decklink {
@@ -60,7 +58,7 @@ std::vector<std::wstring> device_list()
         auto       pDecklinkIterator = create_iterator();
         IDeckLink* decklink;
         for (int n = 1; pDecklinkIterator->Next(&decklink) == S_OK; ++n) {
-            devices.push_back(get_model_name(decklink) + L" [" + boost::lexical_cast<std::wstring>(n) + L"]");
+            devices.push_back(get_model_name(decklink) + L" [" + std::to_wstring(n) + L"]");
             decklink->Release();
         }
     } catch (...) {

@@ -26,18 +26,14 @@
 #include "layer.h"
 
 #include "../frame/draw_frame.h"
-#include "../frame/frame_factory.h"
 
 #include <common/diagnostics/graph.h>
 #include <common/executor.h>
 #include <common/future.h>
-#include <common/timer.h>
 
 #include <core/frame/frame_transform.h>
 
-#include <boost/lexical_cast.hpp>
 #include <boost/range/adaptors.hpp>
-#include <boost/range/algorithm.hpp>
 
 #include <functional>
 #include <future>
@@ -54,7 +50,7 @@ struct stage::impl : public std::enable_shared_from_this<impl>
     std::map<int, layer>                layers_;
     std::map<int, tweened_transform>    tweens_;
 
-    executor executor_{L"stage " + boost::lexical_cast<std::wstring>(channel_index_)};
+    executor executor_{L"stage " + std::to_wstring(channel_index_)};
 
   public:
     impl(int channel_index, spl::shared_ptr<diagnostics::graph> graph)
@@ -223,22 +219,20 @@ struct stage::impl : public std::enable_shared_from_this<impl>
 
         if (other_impl.get() == this)
             return swap_layer(index, other_index, swap_transforms);
-        else {
-            auto func = [=] {
-                auto& my_layer    = get_layer(index);
-                auto& other_layer = other_impl->get_layer(other_index);
+        auto func = [=] {
+            auto& my_layer    = get_layer(index);
+            auto& other_layer = other_impl->get_layer(other_index);
 
-                std::swap(my_layer, other_layer);
+            std::swap(my_layer, other_layer);
 
-                if (swap_transforms) {
-                    auto& my_tween    = tweens_[index];
-                    auto& other_tween = other_impl->tweens_[other_index];
-                    std::swap(my_tween, other_tween);
-                }
-            };
+            if (swap_transforms) {
+                auto& my_tween    = tweens_[index];
+                auto& other_tween = other_impl->tweens_[other_index];
+                std::swap(my_tween, other_tween);
+            }
+        };
 
-            return invoke_both(other, func);
-        }
+        return invoke_both(other, func);
     }
 
     std::future<void> invoke_both(stage& other, std::function<void()> func)
