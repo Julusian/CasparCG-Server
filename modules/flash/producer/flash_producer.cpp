@@ -667,13 +667,13 @@ safe_ptr<core::frame_producer> create_swf_producer(
 std::wstring find_template(const std::wstring& template_name)
 {
 	if(boost::filesystem::exists(template_name + L".ft")) 
-		return url_from_path(template_name + L".ft");
+		return template_name + L".ft";
 	
 	if(boost::filesystem::exists(template_name + L".ct"))
-		return url_from_path(template_name + L".ct");
+		return template_name + L".ct";
 	
 	if(boost::filesystem::exists(template_name + L".swf"))
-		return url_from_path(template_name + L".swf");
+		return template_name + L".swf";
 
 	return L"";
 }
