@@ -61,23 +61,15 @@ struct output::impl
     }
 
     void start_playback() {
-        decltype(consumers_) consumers;
-        {
-            std::lock_guard<std::mutex> lock(consumers_mutex_);
-            consumers = consumers_;
-        }
-
-        for (auto it = consumers.begin(); it != consumers.end();) {
+        std::lock_guard<std::mutex> lock(consumers_mutex_);
+        for (auto it = consumers_.begin(); it != consumers_.end();) {
             try {
                 it->second->start_playback();
                 ++it;
             } catch (...) {
-                CASPAR_LOG_CURRENT_EXCEPTION();
-                it = consumers.erase(it);
-
                 // TODO - is this correct behaviour?
-                std::lock_guard<std::mutex> lock(consumers_mutex_);
-                consumers_.erase(it->first);
+                CASPAR_LOG_CURRENT_EXCEPTION();
+                it = consumers_.erase(it);
             }
         }
     }

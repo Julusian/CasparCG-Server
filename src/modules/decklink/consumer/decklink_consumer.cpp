@@ -809,7 +809,7 @@ struct decklink_consumer : public IDeckLinkVideoOutputCallback
     bool send(core::const_frame frame)
     {
         if (!started_playback)
-            return true;
+            return !abort_request_;
 
         {
             std::lock_guard<std::mutex> lock(exception_mutex_);
