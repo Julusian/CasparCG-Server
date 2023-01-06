@@ -92,6 +92,7 @@ struct configuration
     latency_t latency           = latency_t::default_latency;
     bool      key_only          = false;
     int       base_buffer_depth = 3;
+    int       hack_playback_group = 0;
 
     core::video_format format = core::video_format::invalid;
     int                src_x = 0;
@@ -125,7 +126,10 @@ void set_latency(const com_iface_ptr<Configuration>& config,
 }
 
 
-com_ptr<IDeckLinkDisplayMode> get_display_mode(const com_iface_ptr<IDeckLinkOutput>& device, core::video_format fmt, BMDPixelFormat pix_fmt, BMDVideoOutputFlags flag)
+com_ptr<IDeckLinkDisplayMode> get_display_mode(const com_iface_ptr<IDeckLinkOutput>& device,
+                                               core::video_format                    fmt,
+                                               BMDPixelFormat                        pix_fmt,
+                                               BMDSupportedVideoModeFlags            flag)
 {
     auto format = get_decklink_video_format(fmt);
 
@@ -145,7 +149,7 @@ com_ptr<IDeckLinkDisplayMode> get_display_mode(const com_iface_ptr<IDeckLinkOutp
     com_ptr<IDeckLinkDisplayMode> mode = wrap_raw<com_ptr>(m, true);
 
     BMDDisplayMode actualMode = bmdModeUnknown;
-    bool supported = false;
+    BOOL supported = false;
 
     if (FAILED(device->DoesSupportVideoMode(bmdVideoConnectionUnspecified, mode->GetDisplayMode(), pix_fmt, flag, &actualMode, &supported)))
         CASPAR_THROW_EXCEPTION(caspar_exception()
@@ -375,10 +379,12 @@ struct decklink_consumer : public IDeckLinkVideoOutputCallback
     std::unique_ptr<key_video_context>  key_context_;
 
     com_ptr<IDeckLinkDisplayMode> mode_ =
-        get_display_mode(output_, decklink_format_desc_.format, bmdFormat8BitBGRA, bmdVideoOutputFlagDefault);
+        get_display_mode(output_, decklink_format_desc_.format, bmdFormat8BitBGRA, bmdSupportedVideoModeDefault);
     int field_count_ = mode_->GetFieldDominance() != bmdProgressiveFrame ? 2 : 1;
 
     std::atomic<bool> abort_request_{false};
+
+    bool              started_playback = false;
 
     bool doFrame(std::shared_ptr<void>& image_data, std::vector<std::int32_t>& audio_data, bool topField)
     {
@@ -524,6 +530,11 @@ struct decklink_consumer : public IDeckLinkVideoOutputCallback
         graph_->set_text(print());
         diagnostics::register_graph(graph_);
 
+        // HACK
+        if (FAILED(configuration_->SetInt(bmdDeckLinkConfigPlaybackGroup, config.hack_playback_group))) {
+            CASPAR_LOG(error) << print() << L" Failed to enable sync group.";
+        }
+
         enable_video(mode_->GetDisplayMode());
 
         if (config.embedded_audio) {
@@ -554,7 +565,9 @@ struct decklink_consumer : public IDeckLinkVideoOutputCallback
             output_->EndAudioPreroll();
         }
 
-        start_playback();
+        if (config.hack_playback_group == 0) {
+            start_playback();
+        }
     }
 
     ~decklink_consumer()
@@ -602,6 +615,11 @@ struct decklink_consumer : public IDeckLinkVideoOutputCallback
 
     void start_playback()
     {
+        if (started_playback) {
+            return;
+        }
+        started_playback = true;
+
         if (FAILED(output_->StartScheduledPlayback(0, decklink_format_desc_.time_scale, 1.0))) {
             CASPAR_THROW_EXCEPTION(caspar_exception() << msg_info(print() + L" Failed to schedule fill playback."));
         }
@@ -790,6 +808,9 @@ struct decklink_consumer : public IDeckLinkVideoOutputCallback
 
     bool send(core::const_frame frame)
     {
+        if (!started_playback)
+            return true;
+
         {
             std::lock_guard<std::mutex> lock(exception_mutex_);
             if (exception_ != nullptr) {
@@ -853,6 +874,10 @@ struct decklink_consumer_proxy : public core::frame_consumer
             consumer_.reset();
             consumer_.reset(new decklink_consumer(format_repository_, config_, format_desc, channel_index));
         });
+    }
+
+    void start_playback() override {
+        executor_.invoke([=] { consumer_->start_playback(); });
     }
 
     std::future<bool> send(core::const_frame frame) override
@@ -943,6 +968,7 @@ create_preconfigured_consumer(const boost::property_tree::wptree&               
     config.key_device_idx    = ptree.get(L"key-device", config.key_device_idx);
     config.embedded_audio    = ptree.get(L"embedded-audio", config.embedded_audio);
     config.base_buffer_depth = ptree.get(L"buffer-depth", config.base_buffer_depth);
+    config.hack_playback_group = ptree.get(L"hack-playback-group", config.hack_playback_group);
 
     auto format_desc_str = ptree.get(L"video-mode", L"");
     if (format_desc_str.size() > 0) {

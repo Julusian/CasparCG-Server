@@ -60,6 +60,28 @@ struct output::impl
     {
     }
 
+    void start_playback() {
+        decltype(consumers_) consumers;
+        {
+            std::lock_guard<std::mutex> lock(consumers_mutex_);
+            consumers = consumers_;
+        }
+
+        for (auto it = consumers.begin(); it != consumers.end();) {
+            try {
+                it->second->start_playback();
+                ++it;
+            } catch (...) {
+                CASPAR_LOG_CURRENT_EXCEPTION();
+                it = consumers.erase(it);
+
+                // TODO - is this correct behaviour?
+                std::lock_guard<std::mutex> lock(consumers_mutex_);
+                consumers_.erase(it->first);
+            }
+        }
+    }
+
     void add(int index, spl::shared_ptr<frame_consumer> consumer)
     {
         remove(index);
@@ -177,6 +199,7 @@ output::output(spl::shared_ptr<diagnostics::graph> graph, const video_format_des
 {
 }
 output::~output() {}
+void output::start_playback() { impl_->start_playback(); }
 void output::add(int index, const spl::shared_ptr<frame_consumer>& consumer) { impl_->add(index, consumer); }
 void output::add(const spl::shared_ptr<frame_consumer>& consumer) { impl_->add(consumer); }
 bool output::remove(int index) { return impl_->remove(index); }

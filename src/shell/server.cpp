@@ -306,6 +306,8 @@ struct server::impl
                         CASPAR_LOG_CURRENT_EXCEPTION();
                     }
                 }
+
+                channel->output().start_playback();
             }
         }
 

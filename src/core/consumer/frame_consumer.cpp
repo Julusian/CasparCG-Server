@@ -111,6 +111,8 @@ class destroy_consumer_proxy : public frame_consumer
         }).detach();
     }
 
+    void start_playback() override { consumer_->start_playback(); }
+
     std::future<bool> send(const_frame frame) override { return consumer_->send(std::move(frame)); }
     void              initialize(const video_format_desc& format_desc, int channel_index) override
     {
@@ -140,6 +142,8 @@ class print_consumer_proxy : public frame_consumer
         consumer_.reset();
         CASPAR_LOG(info) << str << L" Uninitialized.";
     }
+
+    void start_playback() override { consumer_->start_playback(); }
 
     std::future<bool> send(const_frame frame) override { return consumer_->send(std::move(frame)); }
     void              initialize(const video_format_desc& format_desc, int channel_index) override

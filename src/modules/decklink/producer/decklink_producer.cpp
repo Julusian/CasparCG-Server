@@ -299,7 +299,7 @@ com_ptr<IDeckLinkDisplayMode> get_display_mode(const com_iface_ptr<IDeckLinkInpu
     com_ptr<IDeckLinkDisplayMode> mode = wrap_raw<com_ptr>(m, true);
 
     BMDDisplayMode actualMode = bmdModeUnknown;
-    bool supported = false;
+    BOOL           supported  = false;
 
     if (FAILED(device->DoesSupportVideoMode(bmdVideoConnectionUnspecified, mode->GetDisplayMode(), pix_fmt, flag, &supported)))
         CASPAR_THROW_EXCEPTION(caspar_exception()
