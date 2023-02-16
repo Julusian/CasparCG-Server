@@ -73,6 +73,9 @@ set(NUGET_PACKAGES_FOLDER "${CMAKE_CURRENT_BINARY_DIR}/packages")
 
 casparcg_add_runtime_dependency("${PROJECT_SOURCE_DIR}/shell/casparcg.config")
 
+set(Qt6_DIR "C:\\Qt\\6.4.2\\msvc2019_64\\lib\\cmake\\Qt6")
+set(QT_ADDITIONAL_PACKAGES_PREFIX_PATH "C:\\Qt\\6.4.2\\msvc2019_6")
+
 # BOOST
 set(BOOST_INCLUDE_PATH "${NUGET_PACKAGES_FOLDER}/boost.1.67.0.0/lib/native/include")
 link_directories("${NUGET_PACKAGES_FOLDER}/boost_atomic-vc141.1.67.0.0/lib/native")
@@ -90,6 +93,7 @@ link_directories("${NUGET_PACKAGES_FOLDER}/boost_thread-vc141.1.67.0.0/lib/nativ
 add_definitions( -DBOOST_CONFIG_SUPPRESS_OUTDATED_MESSAGE )
 add_definitions( -DBOOST_COROUTINES_NO_DEPRECATION_WARNING )
 add_definitions( -DBOOST_LOCALE_HIDE_AUTO_PTR )
+# add_definitions( -DBOOST_USE_WINDOWS_H )
 
 # FFMPEG
 set(FFMPEG_INCLUDE_PATH "${NUGET_PACKAGES_FOLDER}/FFmpeg.Stable.5.1.2/build/native/include")

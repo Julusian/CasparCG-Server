@@ -11,6 +11,8 @@ if (ENABLE_HTML)
 	add_subdirectory(html)
 endif ()
 
+add_subdirectory(qtwebengine)
+
 if (MSVC)
 	add_subdirectory(flash)
 	add_subdirectory(bluefish)
