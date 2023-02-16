@@ -1,5 +1,9 @@
 cmake_minimum_required (VERSION 3.10)
 
+if (MSVC)
+	set(CMAKE_TOOLCHAIN_FILE "${CMAKE_CURRENT_SOURCE_DIR}/../vcpkg/scripts/buildsystems/vcpkg.cmake" CACHE STRING "Vcpkg toolchain file")
+endif()
+
 # Project settings
 PROJECT ("CasparCG Server")
 SET (CONFIG_VERSION_MAJOR 2)

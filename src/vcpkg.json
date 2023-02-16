@@ -1,0 +1,84 @@
+{
+    "name": "casparcg-server",
+    "version": "0.0.0",
+    "dependencies": [
+        {
+            "name": "boost-system",
+            "version>=": "1.81.0#1"
+        },
+        {
+            "name": "boost-thread",
+            "version>=": "1.81.0#1"
+        },
+        {
+            "name": "boost-chrono",
+            "version>=": "1.81.0#1"
+        },
+        {
+            "name": "boost-filesystem",
+            "version>=": "1.81.0#1"
+        },
+        {
+            "name": "boost-log",
+            "version>=": "1.81.0#1"
+        },
+        {
+            "name": "boost-locale",
+            "version>=": "1.81.0#1"
+        },
+        {
+            "name": "boost-regex",
+            "version>=": "1.81.0#1"
+        },
+        {
+            "name": "boost-date-time",
+            "version>=": "1.81.0#1"
+        },
+        {
+            "name": "boost-circular-buffer",
+            "version>=": "1.81.0#1"
+        },
+        {
+            "name": "boost-stacktrace",
+            "version>=": "1.81.0#1"
+        },
+        {
+            "name": "boost-signals2",
+            "version>=": "1.81.0#1"
+        },
+        {
+            "name": "boost-crc",
+            "version>=": "1.81.0#1"
+        },
+        {
+            "name": "boost-logic",
+            "version>=": "1.81.0#1"
+        },
+        {
+            "name": "ffmpeg",
+            "version>=": "5.1.2#4",
+            "features": [ "all-gpl" ]
+        },
+        {
+            "name": "tbb",
+            "version>=": "2021.8.0"
+        },
+        {
+            "name": "glew",
+            "version>=": "2.2.0"
+        },
+        {
+            "name": "sfml",
+            "version>=": "2.5.1#14"
+        },
+        {
+            "name": "freeimage",
+            "version>=": "3.18.0#24"
+        },
+        {
+            "name": "zlib",
+            "version>=": "1.2.13"
+        }
+    ],
+    "builtin-baseline": "1cc952582b2174ce1ffc1dc504574f2db67fabd8"
+}
