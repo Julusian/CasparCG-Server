@@ -12,4 +12,4 @@ bool intercept_command_line(int argc, char** argv);
 void init(core::module_dependencies dependencies);
 void uninit();
 
-}} // namespace caspar::qtquick
+}} // namespace caspar::qtwebengine

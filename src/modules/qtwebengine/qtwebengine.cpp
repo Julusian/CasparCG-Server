@@ -44,7 +44,7 @@ bool                    application_started = false;
 std::condition_variable application_started_condition;
 } // namespace
 
-namespace caspar { namespace qtquick {
+namespace caspar { namespace qtwebengine {
 
 bool intercept_command_line(int argc, char** argv)
 {

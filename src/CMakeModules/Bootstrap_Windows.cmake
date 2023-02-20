@@ -75,6 +75,7 @@ casparcg_add_runtime_dependency("${PROJECT_SOURCE_DIR}/shell/casparcg.config")
 
 set(Qt6_DIR "C:\\Qt\\6.4.2\\msvc2019_64\\lib\\cmake\\Qt6")
 set(QT_ADDITIONAL_PACKAGES_PREFIX_PATH "C:\\Qt\\6.4.2\\msvc2019_6")
+link_directories("C:\\Qt\\6.4.2\\msvc2019_64\\lib") # HACK
 
 # BOOST
 set(BOOST_INCLUDE_PATH "${NUGET_PACKAGES_FOLDER}/boost.1.67.0.0/lib/native/include")

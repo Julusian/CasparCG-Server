@@ -7,9 +7,9 @@ add_subdirectory(oal)
 add_subdirectory(decklink)
 add_subdirectory(screen)
 add_subdirectory(newtek)
-if (ENABLE_HTML)
-	add_subdirectory(html)
-endif ()
+# if (ENABLE_HTML)
+# 	add_subdirectory(html)
+# endif ()
 
 add_subdirectory(qtwebengine)
 
