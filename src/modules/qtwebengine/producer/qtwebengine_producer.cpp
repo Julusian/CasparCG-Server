@@ -35,12 +35,44 @@
 #include <QThread>
 #include <QTimer>
 #include <QUrl>
+#include <QtWebEngineCore/QWebEngineCertificateError>
+#include <QtWebEngineCore/QWebEnginePage>
+#include <QtWebEngineCore/QWebEngineRegisterProtocolHandlerRequest>
+#include <QtWebEngineWidgets/QWebEngineView>
 
 #include <atomic>
 
+#include "../app.h"
+
 namespace caspar { namespace qtwebengine {
 
-class qt_renderer
+class WebPage : public QWebEnginePage
+{
+    Q_OBJECT
+
+  public:
+    WebPage(QWebEngineProfile* profile, QObject* parent = nullptr)
+        : QWebEnginePage(profile, parent)
+    {
+        connect(this, &QWebEnginePage::selectClientCertificate, this, &WebPage::handleSelectClientCertificate);
+        connect(this, &QWebEnginePage::certificateError, this, &WebPage::handleCertificateError);
+    }
+
+  private slots:
+    void handleCertificateError(QWebEngineCertificateError error)
+    {
+        // Always allow all certificates
+        error.acceptCertificate();
+    }
+
+    void handleSelectClientCertificate(QWebEngineClientCertificateSelection selection)
+    {
+        // Just select one.
+        selection.select(selection.certificates().at(0));
+    }
+};
+
+class qtwebengine_view
 {
     using loaded_callback_t = std::function<void()>;
 
@@ -48,6 +80,7 @@ class qt_renderer
     const core::video_format_desc              format_desc_;
     const spl::shared_ptr<core::frame_factory> frame_factory_;
 
+    /*
     QQuickRenderControl                       control_;
     QOpenGLContext                            context_;
     QOffscreenSurface                         surface_;
@@ -55,11 +88,12 @@ class qt_renderer
     QQmlEngine                                engine_;
     QQuickWindow                              window_;
     std::unique_ptr<QQmlComponent>            qmlComponent_;
+    */
 
     spl::shared_ptr<diagnostics::graph> graph_;
 
-    QTimer                      updateTimer_;
-    std::unique_ptr<QQuickItem> rootItem_;
+    QTimer                          updateTimer_;
+    std::unique_ptr<QWebEngineView> web_view_;
 
     mutable std::mutex frame_mutex_;
     core::draw_frame   frame_;
@@ -73,7 +107,10 @@ class qt_renderer
         */
     }
 
-    void destroyFbo() { fbo_.reset(nullptr); }
+    void destroyFbo()
+    {
+        // fbo_.reset(nullptr);
+    }
 
     void requestUpdate()
     {
@@ -83,6 +120,7 @@ class qt_renderer
 
     void render()
     {
+        /*
         boost::timer timer;
         timer.restart();
 
@@ -119,10 +157,12 @@ class qt_renderer
         }
 
         graph_->set_value("render-time", timer.elapsed() * format_desc_.fps);
+        */
     }
 
     void run()
     {
+        /*
         if (qmlComponent_->isError()) {
             const QList<QQmlError> errorList = qmlComponent_->errors();
             for (const QQmlError& error : errorList)
@@ -155,27 +195,31 @@ class qt_renderer
         context_.makeCurrent(&surface_);
        // control_.initialize(&context_);
 
-        QMetaObject::invokeMethod(QCoreApplication::instance(), [this]() { requestUpdate(); });
+        QMetaObject::invokeMethod(get_qt_application(), [this]() { requestUpdate(); });
         loaded_callback_();
+
+        */
     }
 
     void updateSizes()
-    {
+    { /*
         // Behave like SizeRootObjectToView.
         rootItem_->setWidth(format_desc_.width);
         rootItem_->setHeight(format_desc_.height);
 
         window_.setGeometry(0, 0, format_desc_.width, format_desc_.height);
+        */
     }
 
   public:
-    qt_renderer(const spl::shared_ptr<core::frame_factory>& frame_factory,
-                const loaded_callback_t&                    loaded_callback,
-                core::video_format_desc                     format_desc)
+    qtwebengine_view(const spl::shared_ptr<core::frame_factory>& frame_factory,
+                     const loaded_callback_t&                    loaded_callback,
+                     core::video_format_desc                     format_desc)
         : loaded_callback_(loaded_callback)
         , format_desc_(format_desc)
         , frame_factory_(frame_factory)
-        , window_(&control_)
+        , web_view_(std::make_unique<QWebEngineView>())
+        //, window_(&control_)
         , frame_(core::draw_frame{})
     {
         graph_->set_color("render-time", diagnostics::color(0.1f, 1.0f, 0.1f));
@@ -183,8 +227,38 @@ class qt_renderer
         diagnostics::register_graph(graph_);
 
         // All of Qt must be initialized from Qt's main thread to work.
-        assert(QThread::currentThread() == QGuiApplication::instance()->thread());
+        // TODO - this check is failing, but everything is working..
+        //assert(QThread::currentThread() == get_qt_application()->thread());
 
+        // QObject::connect(web_page_.get(), &QWebEnginePage::featurePermissionRequested, this,
+        // &WebView::handleFeaturePermissionRequested);
+
+        QObject::connect(web_view_.get(), &QWebEngineView::loadStarted, [this]() { CASPAR_LOG(info) << "Loading"; });
+        QObject::connect(web_view_.get(), &QWebEngineView::loadFinished, [this](bool success) {
+            CASPAR_LOG(info) << (success ? "Load successful" : "Load failed");
+        });
+
+        QObject::connect(web_view_.get(),
+                         &QWebEngineView::renderProcessTerminated,
+                         [this](QWebEnginePage::RenderProcessTerminationStatus termStatus, int statusCode) {
+                             // TODO - some better error handling
+                             switch (termStatus) {
+                                 case QWebEnginePage::NormalTerminationStatus:
+                                     CASPAR_LOG(warning) << "Render process normal exit";
+                                     break;
+                                 case QWebEnginePage::AbnormalTerminationStatus:
+                                     CASPAR_LOG(warning) << "Render process abnormal exit";
+                                     break;
+                                 case QWebEnginePage::CrashedTerminationStatus:
+                                     CASPAR_LOG(warning) << "Render process crashed";
+                                     break;
+                                 case QWebEnginePage::KilledTerminationStatus:
+                                     CASPAR_LOG(warning) << "Render process killed";
+                                     break;
+                             }
+                         });
+
+        /*
         QSurfaceFormat format;
         // Qt Quick may need a depth and stencil buffer. Always make sure these are available.
         format.setDepthBufferSize(16);
@@ -209,16 +283,20 @@ class qt_renderer
         QObject::connect(&window_, &QQuickWindow::sceneGraphInitialized, [this]() { createFbo(); });
 
         QObject::connect(&window_, &QQuickWindow::sceneGraphInvalidated, [this]() { destroyFbo(); });
+        */
     }
 
-    ~qt_renderer()
+    ~qtwebengine_view()
     {
+        /*
         context_.makeCurrent(&surface_);
         control_.invalidate();
+        */
     }
 
     void startQuick(const QString& filename)
     {
+        /*
         qmlComponent_ = std::unique_ptr<QQmlComponent>(new QQmlComponent(&engine_, QUrl(filename)));
 
         if (qmlComponent_->isLoading()) {
@@ -230,65 +308,70 @@ class qt_renderer
         } else {
             run();
         }
+        */
     }
 
     void execute_javascript(const std::vector<std::wstring>& params)
     {
+        /*
         assert(rootItem_);
         if (params.size() == 1)
             QMetaObject::invokeMethod(rootItem_.get(), u8(params.at(0)).c_str());
         else
             QMetaObject::invokeMethod(
                 rootItem_.get(), u8(params.at(0)).c_str(), Q_ARG(QVariant, QString::fromStdWString(params.at(1))));
+        */
     }
 
     core::draw_frame receive_frame()
     {
         core::draw_frame frame;
 
+        /*
         {
             std::lock_guard<std::mutex> lock(frame_mutex_);
             frame = frame_;
         }
 
-        QMetaObject::invokeMethod(QCoreApplication::instance(), [this]() { requestUpdate(); });
+        QMetaObject::invokeMethod(get_qt_application(), [this]() { requestUpdate(); });
+        */
 
         return frame;
     }
 };
 
-class qtquick_producer : public core::frame_producer
+class qtwebengine_producer : public core::frame_producer
 {
     const std::wstring url_;
 
-    std::unique_ptr<qt_renderer> renderer_;
+    std::unique_ptr<qtwebengine_view> renderer_;
 
     tbb::concurrent_queue<std::vector<std::wstring>> javascript_before_load_;
     std::atomic<bool>                                loaded_;
 
   public:
-    qtquick_producer(const spl::shared_ptr<core::frame_factory>& frame_factory,
-                     const core::video_format_desc&              format_desc,
-                     const std::wstring&                         url)
+    qtwebengine_producer(const spl::shared_ptr<core::frame_factory>& frame_factory,
+                         const core::video_format_desc&              format_desc,
+                         const std::wstring&                         url)
         : url_(url)
     {
         loaded_ = false;
 
-        QMetaObject::invokeMethod(QCoreApplication::instance(),
-                                  [this, url, frame_factory, format_desc]() {
-                                      auto loaded_callback = [this]() { renderer_loaded(); };
-                                      renderer_ =
-                                          std::make_unique<qt_renderer>(frame_factory, loaded_callback, format_desc);
-                                      renderer_->startQuick(QString::fromStdWString(url));
-                                  },
-                                  Qt::QueuedConnection);
+        QMetaObject::invokeMethod(
+            get_qt_application(),
+            [this, url, frame_factory, format_desc]() {
+                auto loaded_callback = [this]() { renderer_loaded(); };
+                renderer_            = std::make_unique<qtwebengine_view>(frame_factory, loaded_callback, format_desc);
+                renderer_->startQuick(QString::fromStdWString(url));
+            },
+            Qt::QueuedConnection);
     }
 
-    ~qtquick_producer()
+    ~qtwebengine_producer()
     {
-        qt_renderer* renderer = renderer_.release();
+        qtwebengine_view* renderer = renderer_.release();
         QMetaObject::invokeMethod(
-            QCoreApplication::instance(), [renderer]() { delete renderer; }, Qt::QueuedConnection);
+            get_qt_application(), [renderer]() { delete renderer; }, Qt::QueuedConnection);
     }
 
     void renderer_loaded()
@@ -297,10 +380,11 @@ class qtquick_producer : public core::frame_producer
         execute_queued_javascript();
     }
 
-    std::wstring name() const override { return L"qtquick"; }
+    std::wstring name() const override { return L"qtwebengine"; }
 
     core::draw_frame receive_impl(const core::video_field field, int nb_samples) override
     {
+        // TODO - race condition on renderer_ here and everywhere?
         if (renderer_) {
             return renderer_->receive_frame();
         }
@@ -340,21 +424,21 @@ class qtquick_producer : public core::frame_producer
 spl::shared_ptr<core::frame_producer> create_producer(const core::frame_producer_dependencies& dependencies,
                                                       const std::vector<std::wstring>&         params)
 {
-    const auto filename       = env::template_folder() + params.at(0) + L".qml";
+    const auto html_prefix    = boost::iequals(params.at(0), L"[HTML]");
+    const auto param_url      = html_prefix ? params.at(1) : params.at(0);
+    const auto filename       = env::template_folder() + param_url + L".html";
     const auto found_filename = find_case_insensitive(filename);
-    const auto url_prefix     = boost::iequals(params.at(0), L"[URL]");
+    const auto http_prefix =
+        boost::algorithm::istarts_with(param_url, L"http:") || boost::algorithm::istarts_with(param_url, L"https:");
 
-    if (!found_filename && !url_prefix)
+    if (!found_filename && !http_prefix && !html_prefix)
         return core::frame_producer::empty();
 
-    const auto url = found_filename ? QUrl::fromLocalFile(QString::fromStdWString(*found_filename)).toString().toStdWString() : params.at(1);
-
-    if (!url_prefix && (!boost::algorithm::contains(url, ".") || boost::algorithm::ends_with(url, "_A") ||
-                        boost::algorithm::ends_with(url, "_ALPHA")))
-        return core::frame_producer::empty();
+    // TODO - is this qt compatible
+    const auto url = found_filename ? L"file://" + *found_filename : param_url;
 
     return core::create_destroy_proxy(
-        spl::make_shared<qtquick_producer>(dependencies.frame_factory, dependencies.format_desc, url));
+        spl::make_shared<qtwebengine_producer>(dependencies.frame_factory, dependencies.format_desc, url));
 }
 
-}} // namespace caspar::qtquick
+}} // namespace caspar::qtwebengine
