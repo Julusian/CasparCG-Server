@@ -526,6 +526,7 @@ struct decklink_consumer : public IDeckLinkVideoOutputCallback
         if (key_context_) {
             graph_->set_color("key-offset", diagnostics::color(1.0f, 0.0f, 0.0f));
         }
+        graph_->set_color("key-offset", diagnostics::color(1.0f, 0.0f, 0.0f));
 
         graph_->set_text(print());
         diagnostics::register_graph(graph_);
@@ -668,6 +669,10 @@ struct decklink_consumer : public IDeckLinkVideoOutputCallback
 
             auto dframe = reinterpret_cast<decklink_frame*>(completed_frame);
             ++scheduled_frames_completed_;
+
+            graph_->set_value(
+                "key-offset",
+                static_cast<double>(scheduled_frames_completed_ % 10) * 0.1);
 
             if (key_context_) {
                 graph_->set_value(
