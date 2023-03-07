@@ -599,7 +599,7 @@ struct decklink_consumer : public IDeckLinkVideoOutputCallback
 
     void enable_video(BMDDisplayMode display_mode)
     {
-        if (FAILED(output_->EnableVideoOutput(display_mode, bmdVideoOutputFlagDefault))) {
+        if (FAILED(output_->EnableVideoOutput(display_mode, bmdVideoOutputSynchronizeToPlaybackGroup))) {
             CASPAR_THROW_EXCEPTION(caspar_exception() << msg_info(print() + L" Could not enable fill video output."));
         }
 
@@ -622,7 +622,7 @@ struct decklink_consumer : public IDeckLinkVideoOutputCallback
         started_playback = true;
 
         if (FAILED(output_->StartScheduledPlayback(0, decklink_format_desc_.time_scale, 1.0))) {
-            CASPAR_THROW_EXCEPTION(caspar_exception() << msg_info(print() + L" Failed to schedule fill playback."));
+          //  CASPAR_THROW_EXCEPTION(caspar_exception() << msg_info(print() + L" Failed to schedule fill playback."));
         }
 
         if (key_context_ &&
