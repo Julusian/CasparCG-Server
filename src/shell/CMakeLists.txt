@@ -51,29 +51,26 @@ if (MSVC)
 	target_link_libraries(casparcg
 		Winmm.lib
 		Ws2_32.lib
-		optimized tbb.lib
-		optimized tbbmalloc.lib
-		debug tbb_debug.lib
-		debug tbbmalloc_debug.lib
-		OpenGL32.lib
-		glew32.lib
-		openal32.lib
-		debug zlibstaticd.lib
-		optimized zlibstatic.lib
-		debug sfml-graphics-d.lib
-		debug sfml-window-d.lib
-		debug sfml-system-d.lib
-		optimized sfml-graphics.lib
-		optimized sfml-window.lib
-		optimized sfml-system.lib
 
-		avformat.lib
-		avcodec.lib
-		avutil.lib
-		avfilter.lib
-		avdevice.lib
-		swscale.lib
-		swresample.lib
+		Boost::boost
+		Boost::system
+		Boost::thread
+		Boost::chrono
+		Boost::filesystem
+		Boost::log
+		Boost::locale
+		Boost::regex
+		Boost::date_time
+		Boost::coroutine
+
+		TBB::tbb
+		TBB::tbbmalloc
+		TBB::tbbmalloc_proxy
+		GLEW::GLEW
+		OpenAL::OpenAL
+		ZLIB::ZLIB
+		${SFML_LIBRARIES}
+		${FFMPEG_LIBRARIES}
 
 		d3d9.lib
 		d3d11.lib
