@@ -16,9 +16,14 @@ mkdir dist || goto :error
 echo Setting up VC++...
 call "%BUILD_VCVARSALL%" amd64 || goto :error
 
+:: Setup vcpkg
+cd vcpkg
+.\bootstrap-vcpkg.bat
+cd ..
+
 :: Run cmake
 cd dist || goto :error
-cmake -G "Visual Studio 16 2019" -A x64 ..\src || goto :error
+cmake -G "Visual Studio 16 2019" -A x64 ..\src -DCMAKE_TOOLCHAIN_FILE=..\vcpkg\scripts\buildsystems\vcpkg.cmake || goto :error
 
 :: Restore dependencies
 echo Restore dependencies...
