@@ -31,7 +31,7 @@ if(MSVC)
 			common
 			core
 
-			OpenAL32)
+			OpenAL::OpenAL)
 else()
 	target_link_libraries(oal
 			common

@@ -132,10 +132,8 @@ find_package(FREEIMAGE CONFIG REQUIRED)
 find_package(ZLIB REQUIRED)
 
 # OPENAL
-set(OPENAL_INCLUDE_PATH "${PACKAGES_FOLDER}/openal/include")
-set(OPENAL_BIN_PATH "${PACKAGES_FOLDER}/openal/bin/win32")
-link_directories("${PACKAGES_FOLDER}/openal/lib/win32")
-casparcg_add_runtime_dependency("${OPENAL_BIN_PATH}/OpenAL32.dll")
+find_package(OpenAL CONFIG REQUIRED)
+# casparcg_add_runtime_dependency("${OPENAL_BIN_PATH}/OpenAL32.dll")
 
 # LIBERATION_FONTS
 set(LIBERATION_FONTS_BIN_PATH "${PROJECT_SOURCE_DIR}/shell/liberation-fonts")

@@ -68,6 +68,10 @@
             "version>=": "2.2.0"
         },
         {
+            "name": "openal-soft",
+            "version>=": "1.22.2"
+        },
+        {
             "name": "sfml",
             "version>=": "2.5.1#14"
         },
