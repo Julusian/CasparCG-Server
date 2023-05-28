@@ -84,5 +84,8 @@
             "version>=": "1.2.13"
         }
     ],
-    "builtin-baseline": "1cc952582b2174ce1ffc1dc504574f2db67fabd8"
+    "builtin-baseline": "1cc952582b2174ce1ffc1dc504574f2db67fabd8",
+    "vcpkg-configuration": {
+        "overlay-triplets": [ "./vcpkg-config/triplets" ]
+    }
 }
