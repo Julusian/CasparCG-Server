@@ -6,7 +6,8 @@
 #include <QtGlobal>
 #include <QtWebEngineCore/QWebEngineProfile>
 #include <QtWebEngineCore/QWebEngineSettings>
-#include <QtWidgets/QApplication>
+#include <QtWebEngineQuick/QtWebEngineQuick>
+#include <QGuiApplication>
 
 #include <memory>
 
@@ -16,7 +17,7 @@ struct ApplicationHolder
 {
     ApplicationHolder(int argc, char* argv[])
         : m_argc(new int(argc))
-        , m_app(new QApplication(*m_argc, argv))
+        , m_app(new QGuiApplication(*m_argc, argv))
     {
         // m_argc = new int(argc);
         // m_app  = new QApplication(*m_argc, argv);
@@ -28,7 +29,7 @@ struct ApplicationHolder
     }
 
     int*          m_argc;
-    QApplication* m_app; // TODO - should this be QCoreApplication or QGuiApplication?
+    QGuiApplication* m_app; // TODO - should this be QCoreApplication or QGuiApplication?
 };
 
 namespace {
@@ -44,18 +45,21 @@ std::condition_variable application_started_condition;
 namespace caspar { namespace qtwebengine {
 
 // TODO - this is a hack
-QApplication* get_qt_application() { return application->m_app; }
+QGuiApplication* get_qt_application() { return application->m_app; }
 
 bool start_qt_application(int argc, char** argv)
 {
     thread = std::thread([argc, argv]() {
-        QCoreApplication::setOrganizationName("CasparCG");
-        // int          argc0 = 0;
-        // char** argv0 = new char*[1];
-        // argv0[0]           = nullptr;
 
-        // QApplication app(argc0, argv0);
+        QCoreApplication::setOrganizationName("CasparCG");
+        QCoreApplication::setAttribute(Qt::AA_ShareOpenGLContexts, true);
+
+        QtWebEngineQuick::initialize();
+
         application = std::make_unique<ApplicationHolder>(argc, argv);
+
+        // only functional when Qt Quick is also using OpenGL
+        QQuickWindow::setGraphicsApi(QSGRendererInterface::OpenGL);
 
         //QWebEngineProfile::defaultProfile()->settings()->setAttribute(QWebEngineSettings::PluginsEnabled, true);
         //QWebEngineProfile::defaultProfile()->settings()->setAttribute(QWebEngineSettings::DnsPrefetchEnabled, true);

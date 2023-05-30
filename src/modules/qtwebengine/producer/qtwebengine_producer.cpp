@@ -19,6 +19,7 @@
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/property_tree/ptree.hpp>
 #include <boost/timer.hpp>
+#include <memory>
 
 #include <tbb/concurrent_queue.h>
 
@@ -27,10 +28,13 @@
 #include <QOpenGLContext>
 #include <QOpenGLFramebufferObject>
 #include <QOpenGLFunctions>
+#include <QQmlApplicationEngine>
 #include <QQmlComponent>
 #include <QQmlEngine>
+#include <QQuickGraphicsDevice>
 #include <QQuickItem>
 #include <QQuickRenderControl>
+#include <QQuickRenderTarget>
 #include <QQuickWindow>
 #include <QThread>
 #include <QTimer>
@@ -38,7 +42,7 @@
 #include <QtWebEngineCore/QWebEngineCertificateError>
 #include <QtWebEngineCore/QWebEnginePage>
 #include <QtWebEngineCore/QWebEngineRegisterProtocolHandlerRequest>
-#include <QtWebEngineWidgets/QWebEngineView>
+#include <QtWebEngineQuick/qtwebenginequickglobal.h>
 
 #include <atomic>
 
@@ -46,9 +50,10 @@
 
 namespace caspar { namespace qtwebengine {
 
+/*
 class WebPage : public QWebEnginePage
 {
-    Q_OBJECT
+    2Q_OBJECT
 
   public:
     WebPage(QWebEngineProfile* profile, QObject* parent = nullptr)
@@ -71,6 +76,81 @@ class WebPage : public QWebEnginePage
         selection.select(selection.certificates().at(0));
     }
 };
+ */
+
+class MyFrame
+{
+  public:
+    std::shared_ptr<QOpenGLContext> context_;
+    QOffscreenSurface               surface_;
+
+    uint  textureId_ = 0;
+    QSize textureSize_;
+
+    explicit MyFrame(const std::shared_ptr<QOpenGLContext>& context)
+        : context_(context)
+    {
+        // Pass m_context->format(), not format. Format does not specify and color buffer
+        // sizes, while the context, that has just been created, reports a format that has
+        // these values filled in. Pass this to the offscreen surface to make sure it will be
+        // compatible with the context's configuration.
+        surface_.setFormat(context_->format());
+        surface_.create();
+    }
+
+    ~MyFrame()
+    {
+        // Make sure the context is current while doing cleanup.
+        context_->makeCurrent(&surface_);
+
+        destroyTexture();
+    }
+
+    /*
+    void resizeTexture(QSize size)
+    {
+        if (context_->makeCurrent(&surface_)) {
+            context_->functions()->glDeleteTextures(1, &textureId_);
+            textureId_ = 0;
+            createTexture(size);
+            context_->doneCurrent();
+        }
+    }
+    */
+
+    void createTexture(QSize size)
+    {
+        // The scene graph has been initialized. It is now time to create an texture and associate
+        // it with the QQuickWindow.
+        // m_dpr = devicePixelRatio();
+        textureSize_        = size;
+        QOpenGLFunctions* f = context_->functions();
+        f->glGenTextures(1, &textureId_);
+        f->glBindTexture(GL_TEXTURE_2D, textureId_);
+        f->glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        f->glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        f->glTexImage2D(GL_TEXTURE_2D,
+                        0,
+                        GL_RGBA,
+                        textureSize_.width(),
+                        textureSize_.height(),
+                        0,
+                        GL_RGBA,
+                        GL_UNSIGNED_BYTE,
+                        nullptr);
+    }
+
+    void destroyTexture()
+    {
+        context_->functions()->glDeleteTextures(1, &textureId_);
+        textureId_ = 0;
+    }
+
+    void bind(QQuickWindow* window)
+    {
+        window->setRenderTarget(QQuickRenderTarget::fromOpenGLTexture(textureId_, textureSize_));
+    }
+};
 
 class qtwebengine_view
 {
@@ -80,65 +160,101 @@ class qtwebengine_view
     const core::video_format_desc              format_desc_;
     const spl::shared_ptr<core::frame_factory> frame_factory_;
 
-    /*
-    QQuickRenderControl                       control_;
-    QOpenGLContext                            context_;
-    QOffscreenSurface                         surface_;
-    std::unique_ptr<QOpenGLFramebufferObject> fbo_;
-    QQmlEngine                                engine_;
-    QQuickWindow                              window_;
-    std::unique_ptr<QQmlComponent>            qmlComponent_;
-    */
+    QQuickRenderControl             control_;
+    std::shared_ptr<QOpenGLContext> context_;
+    QQmlEngine                      engine_;
+    QQuickWindow                    window_;
+    std::unique_ptr<QQmlComponent>  qmlComponent_;
+
+    MyFrame* my_frame_;
 
     spl::shared_ptr<diagnostics::graph> graph_;
 
-    QTimer                          updateTimer_;
-    std::unique_ptr<QWebEngineView> web_view_;
+    QTimer                      updateTimer_;
+    std::unique_ptr<QQuickItem> rootItem_;
+
+    std::unique_ptr<QWebEnginePage> web_page_;
+    // std::unique_ptr<QWebEngineView> web_view_;
+
+    std::unique_ptr<QOpenGLFramebufferObject> fbo_;
 
     mutable std::mutex frame_mutex_;
     core::draw_frame   frame_;
 
     void createFbo()
     {
-        /*
-        fbo_ = std::unique_ptr<QOpenGLFramebufferObject>(new QOpenGLFramebufferObject(
-            QSize(format_desc_.width, format_desc_.height), QOpenGLFramebufferObject::CombinedDepthStencil));
-        window_.setRenderTarget(fbo_.get());
-        */
+        if (!context_->makeCurrent(&my_frame_->surface_))
+            return;
+
+        // my_frame_->createTexture(QSize(format_desc_.width, format_desc_.height));
+        //         auto v = QQuickRenderTarget::fromOpenGLTexture();
+
+        fbo_ = std::make_unique<QOpenGLFramebufferObject>(QSize(format_desc_.width, format_desc_.height),
+                                                          QOpenGLFramebufferObject::CombinedDepthStencil);
+
+        window_.setRenderTarget(QQuickRenderTarget::fromOpenGLTexture(fbo_->texture(), fbo_->size()));
     }
 
     void destroyFbo()
     {
-        // fbo_.reset(nullptr);
+        if (!context_->makeCurrent(&my_frame_->surface_))
+            return;
+
+        // my_frame_->destroyTexture();
+        fbo_.reset(nullptr);
     }
 
     void requestUpdate()
     {
+        // Frame has been consumer, trigger another draw
+        // TODO - this is going to give such inconsistent fps..
         if (!updateTimer_.isActive())
             updateTimer_.start();
     }
 
     void render()
     {
-        /*
+        CASPAR_LOG(debug) << "rrender " << my_frame_->textureId_ << " " << QThread::currentThread();
+
         boost::timer timer;
         timer.restart();
 
-        if (!context_.makeCurrent(&surface_))
+        if (!context_->makeCurrent(&my_frame_->surface_))
             return;
 
-        // Polish, synchronize and render the next frame (into our fbo).  In this example
+        if (my_frame_->textureId_ == 0) {
+            // Ensure frame has been created
+            /// my_frame_->createTexture(QSize(format_desc_.width, format_desc_.height));
+        }
+
+        // my_frame_->bind(&window_);
+
+        // Polish, synchronize and render the next frame (into our texture).  In this example
         // everything happens on the same thread and therefore all three steps are performed
         // in succession from here. In a threaded setup the render() call would happen on a
         // separate thread.
         control_.polishItems();
+        control_.beginFrame();
         control_.sync();
         control_.render();
+        control_.endFrame();
 
-        //window_.resetOpenGLState();
+        // window_.resetOpenGLState();
         QOpenGLFramebufferObject::bindDefault();
 
-        context_.functions()->glFlush();
+        context_->functions()->glFlush();
+
+        /*
+        auto frame = frame_factory_->import_gl_texture(
+            this, my_frame_->textureId_, my_frame_->textureSize_.width(), my_frame_->textureSize_.height());
+        */
+
+        if (!fbo_) {
+            CASPAR_LOG(debug) << "no fbo";
+            return;
+        }
+
+        CASPAR_LOG(debug) << "render fbo";
 
         QImage image  = fbo_->toImage();
         int    width  = image.width();
@@ -146,23 +262,22 @@ class qtwebengine_view
 
         core::pixel_format_desc pixel_desc;
         pixel_desc.format = core::pixel_format::bgra;
-        pixel_desc.planes.push_back(core::pixel_format_desc::plane(width, height, 4));
+        pixel_desc.planes.emplace_back(width, height, 4);
 
         auto                 frame  = frame_factory_->create_frame(this, pixel_desc);
         const unsigned char* buffer = image.bits();
         std::memcpy(frame.image_data(0).begin(), buffer, width * height * 4);
+
         {
             std::lock_guard<std::mutex> lock(frame_mutex_);
             frame_ = core::draw_frame(std::move(frame));
         }
 
         graph_->set_value("render-time", timer.elapsed() * format_desc_.fps);
-        */
     }
 
     void run()
     {
-        /*
         if (qmlComponent_->isError()) {
             const QList<QQmlError> errorList = qmlComponent_->errors();
             for (const QQmlError& error : errorList)
@@ -192,23 +307,21 @@ class qtwebengine_view
         updateSizes();
 
         // Initialize the render control and our OpenGL resources.
-        context_.makeCurrent(&surface_);
-       // control_.initialize(&context_);
+        context_->makeCurrent(&my_frame_->surface_);
+        window_.setGraphicsDevice(QQuickGraphicsDevice::fromOpenGLContext(context_.get()));
+        control_.initialize();
 
         QMetaObject::invokeMethod(get_qt_application(), [this]() { requestUpdate(); });
         loaded_callback_();
-
-        */
     }
 
     void updateSizes()
-    { /*
+    {
         // Behave like SizeRootObjectToView.
         rootItem_->setWidth(format_desc_.width);
         rootItem_->setHeight(format_desc_.height);
 
         window_.setGeometry(0, 0, format_desc_.width, format_desc_.height);
-        */
     }
 
   public:
@@ -218,8 +331,9 @@ class qtwebengine_view
         : loaded_callback_(loaded_callback)
         , format_desc_(format_desc)
         , frame_factory_(frame_factory)
-        , web_view_(std::make_unique<QWebEngineView>())
-        //, window_(&control_)
+        //, web_page_(std::make_unique<QWebEnginePage>())
+        //, web_view_(std::make_unique<QWebEngineView>())
+        , window_(&control_)
         , frame_(core::draw_frame{})
     {
         graph_->set_color("render-time", diagnostics::color(0.1f, 1.0f, 0.1f));
@@ -228,12 +342,25 @@ class qtwebengine_view
 
         // All of Qt must be initialized from Qt's main thread to work.
         // TODO - this check is failing, but everything is working..
-        //assert(QThread::currentThread() == get_qt_application()->thread());
+        // assert(QThread::currentThread() == get_qt_application()->thread());
 
         // QObject::connect(web_page_.get(), &QWebEnginePage::featurePermissionRequested, this,
         // &WebView::handleFeaturePermissionRequested);
 
+        /*
+        QObject::connect(web_page_.get(),
+                         &QWebEnginePage::selectClientCertificate,
+                         [this](QWebEngineClientCertificateSelection selection) {
+                             // Just select one.
+                             selection.select(selection.certificates().at(0));
+                         });
+        QObject::connect(web_page_.get(), &QWebEnginePage::certificateError, [this](QWebEngineCertificateError error) {
+            // Always allow all certificates
+            error.acceptCertificate();
+        });
+
         QObject::connect(web_view_.get(), &QWebEngineView::loadStarted, [this]() { CASPAR_LOG(info) << "Loading"; });
+        QObject::connect(web_view_.get(), &QWebEngineView::loadProgress, [this](int progress) {});
         QObject::connect(web_view_.get(), &QWebEngineView::loadFinished, [this](bool success) {
             CASPAR_LOG(info) << (success ? "Load successful" : "Load failed");
         });
@@ -258,57 +385,72 @@ class qtwebengine_view
                              }
                          });
 
-        /*
+        web_view_->setPage(web_page_.get());
+        web_view_->setUrl(QUrl(QStringLiteral("https://www.qt.io")));
+        */
+
+        // web_view_->render
+
+        // web_view_->show();
+
         QSurfaceFormat format;
         // Qt Quick may need a depth and stencil buffer. Always make sure these are available.
         format.setDepthBufferSize(16);
         format.setStencilBufferSize(8);
 
-        context_.setFormat(format);
-        context_.create();
+        context_ = std::make_shared<QOpenGLContext>();
+        context_->setFormat(format);
+        context_->create();
 
-        surface_.setFormat(format);
-        surface_.create();
+        my_frame_ = new MyFrame(context_);
 
-        window_.setColor(Qt::transparent);
+        // window_.setColor(Qt::transparent);
+        window_.setColor(QColor(255, 0, 0, 255));
 
         if (!engine_.incubationController())
             engine_.setIncubationController(window_.incubationController());
 
+        // Trigger the first render() in a few ms
         updateTimer_.setSingleShot(true);
         updateTimer_.setInterval(5);
-
         QObject::connect(&updateTimer_, &QTimer::timeout, [this]() { render(); });
 
         QObject::connect(&window_, &QQuickWindow::sceneGraphInitialized, [this]() { createFbo(); });
 
         QObject::connect(&window_, &QQuickWindow::sceneGraphInvalidated, [this]() { destroyFbo(); });
-        */
+        QObject::connect(&window_,
+                         &QQuickWindow::sceneGraphError,
+                         [this](QQuickWindow::SceneGraphError error, const QString& message) {
+                             CASPAR_LOG(error) << "Scene graph failed: " << message.toStdString();
+                         });
+        QObject::connect(
+            &window_, &QQuickWindow::sceneGraphAboutToStop, [this]() { CASPAR_LOG(info) << "sceneGraphAboutToStop"; });
+
+        QObject::connect(
+            &control_, &QQuickRenderControl::renderRequested, [this]() { CASPAR_LOG(info) << "renderRequested"; });
+        QObject::connect(
+            &control_, &QQuickRenderControl::sceneChanged, [this]() { CASPAR_LOG(info) << "sceneChanged"; });
     }
 
     ~qtwebengine_view()
     {
-        /*
-        context_.makeCurrent(&surface_);
+        context_->makeCurrent(&my_frame_->surface_);
         control_.invalidate();
-        */
     }
 
     void startQuick(const QString& filename)
     {
-        /*
-        qmlComponent_ = std::unique_ptr<QQmlComponent>(new QQmlComponent(&engine_, QUrl(filename)));
+        qmlComponent_ = std::make_unique<QQmlComponent>(&engine_, QUrl(filename));
 
         if (qmlComponent_->isLoading()) {
             auto conn = std::make_shared<QMetaObject::Connection>();
             *conn     = QObject::connect(qmlComponent_.get(), &QQmlComponent::statusChanged, [this, conn]() {
                 QObject::disconnect(*conn);
                 run();
-            });
+                });
         } else {
             run();
         }
-        */
     }
 
     void execute_javascript(const std::vector<std::wstring>& params)
@@ -327,14 +469,12 @@ class qtwebengine_view
     {
         core::draw_frame frame;
 
-        /*
         {
             std::lock_guard<std::mutex> lock(frame_mutex_);
             frame = frame_;
         }
 
         QMetaObject::invokeMethod(get_qt_application(), [this]() { requestUpdate(); });
-        */
 
         return frame;
     }
@@ -362,7 +502,7 @@ class qtwebengine_producer : public core::frame_producer
             [this, url, frame_factory, format_desc]() {
                 auto loaded_callback = [this]() { renderer_loaded(); };
                 renderer_            = std::make_unique<qtwebengine_view>(frame_factory, loaded_callback, format_desc);
-                renderer_->startQuick(QString::fromStdWString(url));
+                renderer_->startQuick("demo.qml");
             },
             Qt::QueuedConnection);
     }
@@ -412,7 +552,7 @@ class qtwebengine_producer : public core::frame_producer
             renderer_->execute_javascript(params);
     }
 
-    std::wstring print() const override { return L"qtquick[" + url_ + L"]"; }
+    std::wstring print() const override { return L"qtwebengine[" + url_ + L"]"; }
 
     core::monitor::state state() const override
     {

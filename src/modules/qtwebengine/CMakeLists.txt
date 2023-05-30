@@ -29,7 +29,7 @@ include_directories(${QT6_INCLUDE_PATH})
 #find_package(Qt6 REQUIRED COMPONENTS Core Gui WebEngineWidgets)
 #qt6_standard_project_setup()
 
-target_link_libraries(qtwebengine Qt6::Core Qt6::Quick Qt6Widgets Qt6WebEngineCore Qt6WebEngineWidgets)
+target_link_libraries(qtwebengine Qt6::Core Qt6::Quick Qt6Widgets Qt6WebEngineCore Qt6WebEngineQuick)
 
 set_target_properties(qtwebengine PROPERTIES FOLDER modules)
 source_group(sources\\producer producer/*)
