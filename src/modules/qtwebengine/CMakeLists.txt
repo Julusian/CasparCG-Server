@@ -24,8 +24,8 @@ include_directories(${BOOST_INCLUDE_PATH})
 include_directories(${TBB_INCLUDE_PATH})
 include_directories(${QT6_INCLUDE_PATH})
 
-find_package(Qt6 REQUIRED COMPONENTS Core Gui WebEngineWidgets)
-qt6_standard_project_setup()
+#find_package(Qt6 REQUIRED COMPONENTS Core Gui WebEngineWidgets)
+#qt6_standard_project_setup()
 
 target_link_libraries(qtwebengine Qt6::Core Qt6::Quick Qt6WebEngineCore)
 

@@ -1,5 +1,8 @@
 cmake_minimum_required (VERSION 3.16)
 
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
 # Determine build (target) platform
 INCLUDE (PlatformIntrospection)
 _DETERMINE_PLATFORM (CONFIG_PLATFORM)
@@ -45,6 +48,12 @@ FIND_PACKAGE (TBB REQUIRED)
 FIND_PACKAGE (OpenAL REQUIRED)
 FIND_PACKAGE (SFML 2 COMPONENTS graphics window system REQUIRED)
 FIND_PACKAGE (X11 REQUIRED)
+
+
+set(CMAKE_AUTOMOC ON)
+find_package(Qt6 REQUIRED COMPONENTS Core Gui WebEngineWidgets)
+# qt_standard_project_setup()
+
 
 if (ENABLE_HTML)
 	SET(CEF_ROOT_DIR "/opt/cef" CACHE STRING "Path to CEF")

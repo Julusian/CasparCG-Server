@@ -329,6 +329,12 @@ class qtquick_producer : public core::frame_producer
     }
 
     std::wstring print() const override { return L"qtquick[" + url_ + L"]"; }
+
+    core::monitor::state state() const override
+    {
+        static const core::monitor::state empty;
+        return empty;
+    }
 };
 
 spl::shared_ptr<core::frame_producer> create_producer(const core::frame_producer_dependencies& dependencies,
