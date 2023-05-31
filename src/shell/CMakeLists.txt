@@ -78,14 +78,19 @@ if (MSVC)
 else ()
 	target_link_libraries(casparcg
 		${Boost_LIBRARIES}
-		${TBB_LIBRARIES}
-		${TBB_MALLOC_LIBRARIES}
-		${TBB_MALLOC_PROXY_LIBRARIES}
-		${SFML_LIBRARIES}
-		${GLEW_LIBRARIES}
+		TBB::tbb
+		TBB::tbbmalloc
+		TBB::tbbmalloc_proxy
+
+		sfml-window
+		sfml-graphics
+
+		GLEW::GLEW
 		OpenGL::OpenGL
 		${X11_LIBRARIES}
+
 		${FFMPEG_LIBRARIES}
+
 		dl
 		icui18n
 		icuuc
