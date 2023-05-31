@@ -57,7 +57,7 @@
         {
             "name": "ffmpeg",
             "version>=": "5.1.2#6",
-            "features": [ "all-gpl" ]
+            "features": [ "all-gpl", "ffmpeg" ]
         },
         {
             "name": "tbb",
