@@ -1,6 +1,7 @@
 cmake_minimum_required (VERSION 3.10)
 
-set(VCPKG_TARGET_TRIPLET "x64-windows-mixed" CACHE STRING "Vcpkg triplet")
+set(VCPKG_TARGET_TRIPLET "x64-windows-mixed" CACHE STRING "vcpkg triplet")
+set(VCPKG_BINARY_SOURCES "clear;nuget,https://nuget.pkg.github.com/Julusian/index.json,read" CACHE STRING "vcpkg binary caching")
 if (MSVC)
 	set(CMAKE_TOOLCHAIN_FILE "${CMAKE_CURRENT_SOURCE_DIR}/../vcpkg/scripts/buildsystems/vcpkg.cmake" CACHE STRING "Vcpkg toolchain file" FORCE)
 endif()
