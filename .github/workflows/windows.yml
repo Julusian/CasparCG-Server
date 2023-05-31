@@ -7,40 +7,49 @@ on:
         branches: ["master"]
 
 env:
-  VCPKG_BINARY_SOURCES: 'clear;nuget,GitHub,readwrite'
+    VCPKG_BINARY_SOURCES: "clear;nuget,GitHub,readwrite"
 
 jobs:
     build:
         runs-on: windows-2019
-        timeout-minutes: 90
+        timeout-minutes: 150 # rebuilding the vcpkg cache from scratch is slow
+
+        permissions:
+            packages: write
 
         steps:
             - uses: actions/checkout@v3
               with:
-                submodules: true
+                  fetch-depth: 0
+                  submodules: "recursive"
 
             - name: Bootstrap vcpkg
+              shell: bash
               run: |
-                  ./vcpkg/bootstrap-vcpkg.bat
+                  rm -rf "$VCPKG_INSTALLATION_ROOT"
+
+                  cd vcpkg
+                  ./bootstrap-vcpkg.bat
+
               env:
                   CI: 1
-                
-            - name: 'Setup NuGet Credentials'
-              shell: 'bash'
+
+            - name: Setup NuGet Credentials
+              shell: bash
+              if: ${{ env.has_token == 'true' }}
               run: |
-                ./vcpkg/vcpkg.exe fetch nuget | tail -n 1 \
-                  sources add \
-                  -source "https://nuget.pkg.github.com/Julusian/index.json" \
-                  -storepasswordincleartext \
-                  -name "GitHub" \
-                  -username "Julusian" \
-                  -password "${{ secrets.GITHUB_TOKEN }}"
-                ./vcpkg/vcpkg.exe fetch nuget | tail -n 1 \
-                  setapikey "${{ secrets.GITHUB_TOKEN }}" \
-                  -source "https://nuget.pkg.github.com/Julusian/index.json"
+                  `./vcpkg/vcpkg.exe fetch nuget | tail -n 1` \
+                    sources add \
+                    -source "https://nuget.pkg.github.com/Julusian/index.json" \
+                    -storepasswordincleartext \
+                    -name "GitHub" \
+                    -username "Julusian" \
+                    -password "${{ secrets.GITHUB_TOKEN }}"
+                  `./vcpkg/vcpkg.exe fetch nuget | tail -n 1` \
+                    setapikey "${{ secrets.GITHUB_TOKEN }}" \
+                    -source "https://nuget.pkg.github.com/Julusian/index.json"
               env:
                   has_token: ${{ !!secrets.GITHUB_TOKEN && github.repository_owner == 'Julusian' && github.event_name == 'push' }}
-
 
             - name: Cache nuget
               uses: actions/cache@v3
@@ -49,6 +58,7 @@ jobs:
                   key: ${{ runner.os }}-nuget
 
             - name: Run build
+              shell: bash
               run: |
                   ./tools/windows/build.bat
               env:

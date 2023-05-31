@@ -1,4 +1,4 @@
-@echo off
+@REM @echo off
 
 set BUILD_ARCHIVE_NAME=casparcg_server
 set BUILD_VCVARSALL=C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Auxiliary\Build\vcvars64.bat
@@ -18,7 +18,7 @@ call "%BUILD_VCVARSALL%" amd64 || goto :error
 
 :: Setup vcpkg
 cd vcpkg
-.\bootstrap-vcpkg.bat
+call .\bootstrap-vcpkg.bat
 cd ..
 
 :: Run cmake
