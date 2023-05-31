@@ -88,52 +88,30 @@ add_definitions( -DBOOST_LOCALE_HIDE_AUTO_PTR )
 find_package(FFMPEG REQUIRED)
 include_directories(${FFMPEG_INCLUDE_DIRS})
 link_directories(${FFMPEG_LIBRARY_DIRS})
-# casparcg_add_runtime_dependency("${FFMPEG_BIN_PATH}/avcodec-59.dll")
-# casparcg_add_runtime_dependency("${FFMPEG_BIN_PATH}/avdevice-59.dll")
-# casparcg_add_runtime_dependency("${FFMPEG_BIN_PATH}/avfilter-8.dll")
-# casparcg_add_runtime_dependency("${FFMPEG_BIN_PATH}/avformat-59.dll")
-# casparcg_add_runtime_dependency("${FFMPEG_BIN_PATH}/avutil-57.dll")
-# casparcg_add_runtime_dependency("${FFMPEG_BIN_PATH}/postproc-56.dll")
-# casparcg_add_runtime_dependency("${FFMPEG_BIN_PATH}/swresample-4.dll")
-# casparcg_add_runtime_dependency("${FFMPEG_BIN_PATH}/swscale-6.dll")
+# copy ffmpeg.exe for the scanner
+casparcg_add_runtime_dependency("${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/tools/ffmpeg/ffmpeg.exe")
 
 # TBB
 find_package(tbb CONFIG REQUIRED)
 include_directories(${tbb_INCLUDE_DIR})
 link_directories(${tbb_LIBRARY_DIR})
-# casparcg_add_runtime_dependency("${TBB_BIN_PATH}/tbb12.dll")
-# casparcg_add_runtime_dependency("${TBB_BIN_PATH}/tbb12_debug.dll")
-# casparcg_add_runtime_dependency("${TBB_BIN_PATH}/tbbmalloc.dll")
-# casparcg_add_runtime_dependency("${TBB_BIN_PATH}/tbbmalloc_debug.dll")
-# casparcg_add_runtime_dependency("${TBB_BIN_PATH}/tbbmalloc_proxy.dll")
-# casparcg_add_runtime_dependency("${TBB_BIN_PATH}/tbbmalloc_proxy_debug.dll")
 
 # GLEW
 find_package(GLEW REQUIRED)
 add_definitions( -DGLEW_NO_GLU )
-# casparcg_add_runtime_dependency("${GLEW_BIN_PATH}/glew32.dll")
 
 # SFML
 find_package(SFML COMPONENTS system window graphics CONFIG REQUIRED)
 link_libraries(sfml-system sfml-network sfml-graphics sfml-window)
-# casparcg_add_runtime_dependency("${NUGET_PACKAGES_FOLDER}/sfml-graphics.redist.2.4.2.0/build/native/bin/x64/v140/Debug/dynamic/sfml-graphics-d-2.dll")
-# casparcg_add_runtime_dependency("${NUGET_PACKAGES_FOLDER}/sfml-graphics.redist.2.4.2.0/build/native/bin/x64/v140/Release/dynamic/sfml-graphics-2.dll")
-# casparcg_add_runtime_dependency("${NUGET_PACKAGES_FOLDER}/sfml-window.redist.2.4.2.0/build/native/bin/x64/v140/Debug/dynamic/sfml-window-d-2.dll")
-# casparcg_add_runtime_dependency("${NUGET_PACKAGES_FOLDER}/sfml-window.redist.2.4.2.0/build/native/bin/x64/v140/Release/dynamic/sfml-window-2.dll")
-# casparcg_add_runtime_dependency("${NUGET_PACKAGES_FOLDER}/sfml-system.redist.2.4.2.0/build/native/bin/x64/v140/Debug/dynamic/sfml-system-d-2.dll")
-# casparcg_add_runtime_dependency("${NUGET_PACKAGES_FOLDER}/sfml-system.redist.2.4.2.0/build/native/bin/x64/v140/Release/dynamic/sfml-system-2.dll")
 
 # FREEIMAGE
 find_package(FREEIMAGE CONFIG REQUIRED)
-# casparcg_add_runtime_dependency("${FREEIMAGE_BIN_PATH}/FreeImage.dll")
-# casparcg_add_runtime_dependency("${FREEIMAGE_BIN_PATH}/FreeImaged.dll")
 
 #ZLIB
 find_package(ZLIB REQUIRED)
 
 # OPENAL
 find_package(OpenAL CONFIG REQUIRED)
-# casparcg_add_runtime_dependency("${OPENAL_BIN_PATH}/OpenAL32.dll")
 
 # LIBERATION_FONTS
 set(LIBERATION_FONTS_BIN_PATH "${PROJECT_SOURCE_DIR}/shell/liberation-fonts")
