@@ -85,11 +85,22 @@ add_definitions( -DBOOST_COROUTINES_NO_DEPRECATION_WARNING )
 add_definitions( -DBOOST_LOCALE_HIDE_AUTO_PTR )
 
 # FFMPEG
-find_package(FFMPEG REQUIRED)
-include_directories(${FFMPEG_INCLUDE_DIRS})
-link_directories(${FFMPEG_LIBRARY_DIRS})
-# copy ffmpeg.exe for the scanner
-casparcg_add_runtime_dependency("${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/tools/ffmpeg/ffmpeg.exe")
+set(FFMPEG_INCLUDE_PATH "${NUGET_PACKAGES_FOLDER}/FFmpeg.Stable.5.1.2/build/native/include")
+set(FFMPEG_BIN_PATH "${NUGET_PACKAGES_FOLDER}/FFmpeg.Stable.5.1.2/build/native/bin/x64")
+link_directories("${NUGET_PACKAGES_FOLDER}/FFmpeg.Stable.5.1.2/build/native/lib/x64")
+casparcg_add_runtime_dependency("${FFMPEG_BIN_PATH}/avcodec-59.dll")
+casparcg_add_runtime_dependency("${FFMPEG_BIN_PATH}/avdevice-59.dll")
+casparcg_add_runtime_dependency("${FFMPEG_BIN_PATH}/avfilter-8.dll")
+casparcg_add_runtime_dependency("${FFMPEG_BIN_PATH}/avformat-59.dll")
+casparcg_add_runtime_dependency("${FFMPEG_BIN_PATH}/avutil-57.dll")
+casparcg_add_runtime_dependency("${FFMPEG_BIN_PATH}/postproc-56.dll")
+casparcg_add_runtime_dependency("${FFMPEG_BIN_PATH}/swresample-4.dll")
+casparcg_add_runtime_dependency("${FFMPEG_BIN_PATH}/swscale-6.dll")
+# find_package(FFMPEG REQUIRED)
+# include_directories(${FFMPEG_INCLUDE_DIRS})
+# link_directories(${FFMPEG_LIBRARY_DIRS})
+# # copy ffmpeg.exe for the scanner
+# casparcg_add_runtime_dependency("${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/tools/ffmpeg/ffmpeg.exe")
 
 # TBB
 find_package(tbb CONFIG REQUIRED)

@@ -55,11 +55,6 @@
             "version>=": "1.81.0#1"
         },
         {
-            "name": "ffmpeg",
-            "version>=": "5.1.2#6",
-            "features": [ "all-gpl", "ffmpeg" ]
-        },
-        {
             "name": "tbb",
             "version>=": "2021.8.0"
         },
