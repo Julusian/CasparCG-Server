@@ -30,7 +30,7 @@ set(HEADERS
 		server.h
 )
 
-add_executable(casparcg ${SOURCES} ${HEADERS} ${OS_SPECIFIC_SOURCES})
+qt_add_executable(casparcg ${SOURCES} ${HEADERS} ${OS_SPECIFIC_SOURCES})
 target_compile_features(casparcg PRIVATE cxx_std_14)
 target_include_directories(casparcg PRIVATE
     ..
@@ -40,17 +40,17 @@ target_include_directories(casparcg PRIVATE
 
 source_group(sources ./*)
 
-target_link_libraries(casparcg
+target_link_libraries(casparcg PUBLIC
 		accelerator
 		common
 		core
 		protocol
-
+		
 		"${CASPARCG_MODULE_PROJECTS}"
 )
 
 if (MSVC)
-	target_link_libraries(casparcg
+	target_link_libraries(casparcg 
 		Winmm.lib
 		Ws2_32.lib
 		optimized tbb.lib
@@ -82,7 +82,7 @@ if (MSVC)
 		dxgi.lib
 	)
 else ()
-	target_link_libraries(casparcg
+	target_link_libraries(casparcg PUBLIC
 		${Boost_LIBRARIES}
 		${TBB_LIBRARIES}
 		${TBB_MALLOC_LIBRARIES}
@@ -97,6 +97,7 @@ else ()
 		icuuc
 		z
 		pthread
+
 	)
 
     set_target_properties(casparcg PROPERTIES INSTALL_RPATH "$ORIGIN/../lib" BUILD_WITH_INSTALL_RPATH ON)

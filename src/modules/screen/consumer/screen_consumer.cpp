@@ -62,6 +62,11 @@
 #include "consumer_screen_vertex.h"
 #include <accelerator/ogl/util/shader.h>
 
+#include <QOpenGLBuffer>
+#include <QOpenGLShaderProgram>
+#include <QOpenGLVertexArrayObject>
+#include <QOpenGLWindow>
+
 namespace caspar { namespace screen {
 
 std::unique_ptr<accelerator::ogl::shader> get_shader()
@@ -119,6 +124,170 @@ struct frame
     GLsync fence = nullptr;
 };
 
+class RectangleWindow : public QOpenGLWindow
+{
+  public:
+    RectangleWindow()
+        : m_program(nullptr)
+    {
+    }
+    ~RectangleWindow() override
+    {
+        // resource cleanup
+
+        // since we release resources related to an OpenGL context,
+        // we make this context current before cleaning up our resources
+        makeCurrent();
+
+        // resource cleanup
+        m_vao.destroy();
+        m_vertexBufferObject.destroy();
+        m_indexBufferObject.destroy();
+        delete m_program;
+    }
+
+    void initializeGL() override
+    {
+        // this function is called once, when the window is first shown, i.e. when
+        // the the window content is first rendered
+
+        // build and compile our shader program
+        // ------------------------------------
+
+        m_program = new QOpenGLShaderProgram();
+
+        // read the shader programs from the resource
+        if (!m_program->addShaderFromSourceFile(QOpenGLShader::Vertex, "./shaders/pass_through.vert"))
+            qDebug() << "Vertex shader errors:\n" << m_program->log();
+
+        if (!m_program->addShaderFromSourceFile(QOpenGLShader::Fragment, "./shaders/simple.frag"))
+            qDebug() << "Fragment shader errors:\n" << m_program->log();
+
+        if (!m_program->link())
+            qDebug() << "Shader linker errors:\n" << m_program->log();
+
+        // set up vertex data (and buffer(s)) and configure vertex attributes
+        // ------------------------------------------------------------------
+
+        float vertices[] = {
+            0.8f,
+            0.8f,
+            0.0f, // top right
+            0.8f,
+            -0.8f,
+            0.0f, // bottom right
+            -0.8f,
+            -0.8f,
+            0.0f, // bottom left
+            -0.8f,
+            0.8f,
+            0.0f // top left
+        };
+
+        QColor vertexColors[] = {
+            QColor("#f6a509"),
+            QColor("#cb2dde"),
+            QColor("#0eeed1"),
+            QColor("#068918"),
+        };
+
+        // create buffer for 2 interleaved attributes: position and color, 4 vertices, 3 floats each
+        std::vector<float> vertexBufferData(2 * 4 * 3);
+        // create new data buffer - the following memory copy stuff should
+        // be placed in some convenience class in later tutorials
+        // copy data in interleaved mode with pattern p0c0|p1c1|p2c2|p3c3
+        float* buf = vertexBufferData.data();
+        for (int v = 0; v < 4; ++v, buf += 6) {
+            // coordinates
+            buf[0] = vertices[3 * v];
+            buf[1] = vertices[3 * v + 1];
+            buf[2] = vertices[3 * v + 2];
+            // colors
+            buf[3] = vertexColors[v].redF();
+            buf[4] = vertexColors[v].greenF();
+            buf[5] = vertexColors[v].blueF();
+        }
+
+        // create a new buffer for the vertices and colors, interleaved storage
+        m_vertexBufferObject = QOpenGLBuffer(QOpenGLBuffer::VertexBuffer);
+        m_vertexBufferObject.create();
+        m_vertexBufferObject.setUsagePattern(QOpenGLBuffer::StaticDraw);
+        m_vertexBufferObject.bind();
+        // now copy buffer data over: first argument pointer to data, second argument: size in bytes
+        m_vertexBufferObject.allocate(vertexBufferData.data(), vertexBufferData.size() * sizeof(float));
+
+        // create and bind Vertex Array Object - must be bound *before* the element buffer is bound,
+        // because the VAO remembers and manages element buffers as well
+        m_vao.create();
+        m_vao.bind();
+
+        unsigned int indices[] = {
+            // note that we start from 0!
+            0,
+            1,
+            3, // first triangle
+            1,
+            2,
+            3 // second triangle
+        };
+
+        // create a new buffer for the indexes
+        m_indexBufferObject = QOpenGLBuffer(QOpenGLBuffer::IndexBuffer); // Mind: use 'IndexBuffer' here
+        m_indexBufferObject.create();
+        m_indexBufferObject.setUsagePattern(QOpenGLBuffer::StaticDraw);
+        m_indexBufferObject.bind();
+        m_indexBufferObject.allocate(indices, sizeof(indices));
+
+        // stride = number of bytes for one vertex (with all its attributes) = 3+3 floats = 6*4 = 24 Bytes
+        int stride = 6 * sizeof(float);
+
+        // layout location 0 - vec3 with coordinates
+        m_program->enableAttributeArray(0);
+        m_program->setAttributeBuffer(0, GL_FLOAT, 0, 3, stride);
+
+        // layout location 1 - vec3 with colors
+        m_program->enableAttributeArray(1);
+        int colorOffset = 3 * sizeof(float);
+        m_program->setAttributeBuffer(1, GL_FLOAT, colorOffset, 3, stride);
+    }
+    void paintGL() override
+    {
+        CASPAR_LOG(info) << "paint";
+
+        // set the background color = clear color
+        glClearColor(0.1f, 0.1f, 0.2f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT);
+
+        // use our shader program
+        m_program->bind();
+        // bind the vertex array object, which in turn binds the vertex buffer object and
+        // sets the attribute buffer in the OpenGL context
+        m_vao.bind();
+        // For old Intel drivers you may need to explicitely re-bind the index buffer, because
+        // these drivers do not remember the binding-state of the index/element-buffer in the VAO
+        //	m_indexBufferObject.bind();
+
+        // now draw the two triangles via index drawing
+        // - GL_TRIANGLES - draw individual triangles via elements
+        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, nullptr);
+        // finally release VAO again (not really necessary, just for completeness)
+        m_vao.release();
+    }
+
+    void resizeGL(int w, int h) override { CASPAR_LOG(info) << "new size " << w << "x" << h; }
+
+  private:
+    // Wraps an OpenGL VertexArrayObject (VAO)
+    QOpenGLVertexArrayObject m_vao;
+    // Vertex buffer (positions and colors, interleaved storage mode).
+    QOpenGLBuffer m_vertexBufferObject;
+    // Index buffer to draw two rectangles
+    QOpenGLBuffer m_indexBufferObject;
+
+    // Holds the compiled shader programs.
+    QOpenGLShaderProgram* m_program;
+};
+
 struct screen_consumer
 {
     const configuration     config_;
@@ -150,7 +319,9 @@ struct screen_consumer
     std::atomic<bool> is_running_{true};
     std::thread       thread_;
 
-    screen_consumer(const screen_consumer&)            = delete;
+    RectangleWindow qt_view_;
+
+    screen_consumer(const screen_consumer&) = delete;
     screen_consumer& operator=(const screen_consumer&) = delete;
 
   public:
@@ -159,6 +330,16 @@ struct screen_consumer
         , format_desc_(format_desc)
         , channel_index_(channel_index)
     {
+        QSurfaceFormat format;
+        format.setRenderableType(QSurfaceFormat::OpenGL);
+        format.setProfile(QSurfaceFormat::CoreProfile);
+        format.setVersion(3, 3);
+
+        qt_view_.setFormat(format);
+        qt_view_.setTitle("My test");
+        qt_view_.resize(640, 480);
+        qt_view_.show();
+
         if (format_desc_.format == core::video_format::ntsc &&
             config_.aspect == configuration::aspect_ratio::aspect_4_3) {
             // Use default values which are 4:3.
@@ -270,6 +451,10 @@ struct screen_consumer
                 shader_->set("background", 0);
                 shader_->set("window_width", screen_width_);
 
+                bool use_alternate_colour_space =
+                    config_.colour_space == configuration::colour_spaces::datavideo_full ||
+                    config_.colour_space == configuration::colour_spaces::datavideo_limited;
+
                 for (int n = 0; n < 2; ++n) {
                     screen::frame frame;
                     auto          flags = GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT | GL_MAP_WRITE_BIT;
@@ -279,18 +464,10 @@ struct screen_consumer
                         reinterpret_cast<char*>(GL2(glMapNamedBufferRange(frame.pbo, 0, format_desc_.size, flags)));
 
                     GL(glCreateTextures(GL_TEXTURE_2D, 1, &frame.tex));
-                    GL(glTextureParameteri(frame.tex,
-                                           GL_TEXTURE_MIN_FILTER,
-                                           (config_.colour_space == configuration::colour_spaces::datavideo_full ||
-                                            config_.colour_space == configuration::colour_spaces::datavideo_limited)
-                                               ? GL_NEAREST
-                                               : GL_LINEAR));
-                    GL(glTextureParameteri(frame.tex,
-                                           GL_TEXTURE_MAG_FILTER,
-                                           (config_.colour_space == configuration::colour_spaces::datavideo_full ||
-                                            config_.colour_space == configuration::colour_spaces::datavideo_limited)
-                                               ? GL_NEAREST
-                                               : GL_LINEAR));
+                    GL(glTextureParameteri(
+                        frame.tex, GL_TEXTURE_MIN_FILTER, use_alternate_colour_space ? GL_NEAREST : GL_LINEAR));
+                    GL(glTextureParameteri(
+                        frame.tex, GL_TEXTURE_MAG_FILTER, use_alternate_colour_space ? GL_NEAREST : GL_LINEAR));
                     GL(glTextureParameteri(frame.tex, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE));
                     GL(glTextureParameteri(frame.tex, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE));
                     GL(glTextureStorage2D(frame.tex, 1, GL_RGBA8, format_desc_.width, format_desc_.height));
@@ -312,8 +489,7 @@ struct screen_consumer
                 }
 
                 shader_->set("colour_space", config_.colour_space);
-                if (config_.colour_space == configuration::colour_spaces::datavideo_full ||
-                    config_.colour_space == configuration::colour_spaces::datavideo_limited) {
+                if (use_alternate_colour_space) {
                     CASPAR_LOG(info) << print() << " Enabled colours conversion for DataVideo TC-100/TC-200 "
                                      << (config_.colour_space == configuration::colour_spaces::datavideo_full
                                              ? "(Full Range)."
@@ -374,6 +550,8 @@ struct screen_consumer
                 std::this_thread::sleep_for(std::chrono::milliseconds(2));
             }
         }
+
+        qt_view_.update();
 
         if (!in_frame) {
             return;
@@ -497,9 +675,9 @@ struct screen_consumer
         if (config_.sbs_key) {
             draw_coords_ = {
                 // First half fill
-                {-target_ratio.first, target_ratio.second, 0.0, 0.0},  // upper left
-                {0, target_ratio.second, 1.0, 0.0},                    // upper right
-                {0, -target_ratio.second, 1.0, 1.0},                   // lower right
+                {-target_ratio.first, target_ratio.second, 0.0, 0.0}, // upper left
+                {0, target_ratio.second, 1.0, 0.0},                   // upper right
+                {0, -target_ratio.second, 1.0, 1.0},                  // lower right
 
                 {-target_ratio.first, target_ratio.second, 0.0, 0.0},  // upper left
                 {0, -target_ratio.second, 1.0, 1.0},                   // lower right

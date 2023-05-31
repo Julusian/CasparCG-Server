@@ -51,7 +51,9 @@ FIND_PACKAGE (X11 REQUIRED)
 
 
 set(CMAKE_AUTOMOC ON)
-find_package(Qt6 REQUIRED COMPONENTS Core Gui WebEngineWidgets)
+set(CMAKE_AUTORCC ON)
+set(CMAKE_AUTOUIC ON)
+find_package(Qt6 REQUIRED COMPONENTS Core Gui Qml Quick WebEngineCore WebEngineQuick)
 # qt_standard_project_setup()
 
 

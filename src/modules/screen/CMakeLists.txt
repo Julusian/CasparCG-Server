@@ -47,6 +47,11 @@ source_group(sources\\consumer consumer/*)
 source_group(sources ./*)
 
 target_link_libraries(screen common core accelerator ffmpeg)
+target_link_libraries(screen  Qt::Core
+		Qt::Gui
+		Qt::Qml
+		Qt::Quick
+        Qt::OpenGL)
 
 casparcg_add_include_statement("modules/screen/screen.h")
 casparcg_add_init_statement("screen::init" "screen")
