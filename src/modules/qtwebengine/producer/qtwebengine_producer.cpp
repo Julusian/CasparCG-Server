@@ -45,6 +45,7 @@
 #include <QtWebEngineQuick/qtwebenginequickglobal.h>
 
 #include <atomic>
+#include <utility>
 
 #include "../app.h"
 
@@ -87,8 +88,8 @@ class MyFrame
     uint  textureId_ = 0;
     QSize textureSize_;
 
-    explicit MyFrame(const std::shared_ptr<QOpenGLContext>& context)
-        : context_(context)
+    explicit MyFrame(std::shared_ptr<QOpenGLContext>  context)
+        : context_(std::move(context))
     {
         // Pass m_context->format(), not format. Format does not specify and color buffer
         // sizes, while the context, that has just been created, reports a format that has
@@ -328,7 +329,7 @@ class qtwebengine_view
                      const loaded_callback_t&                    loaded_callback,
                      core::video_format_desc                     format_desc)
         : loaded_callback_(loaded_callback)
-        , format_desc_(format_desc)
+        , format_desc_(std::move(format_desc))
         , frame_factory_(frame_factory)
         //, web_page_(std::make_unique<QWebEnginePage>())
         //, web_view_(std::make_unique<QWebEngineView>())

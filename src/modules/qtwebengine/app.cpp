@@ -53,6 +53,7 @@ bool start_qt_application(int argc, char** argv)
 
         QCoreApplication::setOrganizationName("CasparCG");
         QCoreApplication::setAttribute(Qt::AA_ShareOpenGLContexts, true);
+        QCoreApplication::setAttribute(Qt::AA_UseDesktopOpenGL, true);
 
         QtWebEngineQuick::initialize();
 
