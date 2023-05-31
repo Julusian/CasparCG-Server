@@ -224,10 +224,10 @@ class qtwebengine_view
 
         if (my_frame_->textureId_ == 0) {
             // Ensure frame has been created
-            /// my_frame_->createTexture(QSize(format_desc_.width, format_desc_.height));
+            my_frame_->createTexture(QSize(format_desc_.width, format_desc_.height));
         }
 
-        // my_frame_->bind(&window_);
+         my_frame_->bind(&window_);
 
         // Polish, synchronize and render the next frame (into our texture).  In this example
         // everything happens on the same thread and therefore all three steps are performed
@@ -244,10 +244,9 @@ class qtwebengine_view
 
         context_->functions()->glFlush();
 
-        /*
-        auto frame = frame_factory_->import_gl_texture(
+        // No errors, but using this frame gives only black
+        auto frame2 = frame_factory_->import_gl_texture(
             this, my_frame_->textureId_, my_frame_->textureSize_.width(), my_frame_->textureSize_.height());
-        */
 
         if (!fbo_) {
             CASPAR_LOG(debug) << "no fbo";

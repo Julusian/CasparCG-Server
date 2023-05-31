@@ -33,7 +33,7 @@ namespace caspar { namespace core {
 class frame_factory
 {
   public:
-    frame_factory()                                = default;
+    frame_factory()        = default;
     frame_factory& operator=(const frame_factory&) = delete;
     virtual ~frame_factory()                       = default;
 
@@ -47,6 +47,9 @@ class frame_factory
                                                  bool                                                    vflip,
                                                  core::pixel_format                                      format) = 0;
 #endif
+
+    virtual class const_frame
+    import_gl_texture(const void* video_stream_tag, unsigned int textureId, int width, int height) = 0;
 };
 
 }} // namespace caspar::core

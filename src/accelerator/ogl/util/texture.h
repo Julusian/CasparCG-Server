@@ -36,9 +36,9 @@ class texture final
     texture& operator=(const texture&) = delete;
     texture& operator=(texture&& other);
 
-#ifdef WIN32
+//#ifdef WIN32
     void copy_from(int source);
-#endif
+//#endif
     void copy_from(class buffer& source);
     void copy_to(class buffer& dest);
 

@@ -374,6 +374,34 @@ struct image_mixer::impl
         return core::const_frame(std::move(frame));
     }
 #endif
+
+    core::const_frame import_gl_texture(const void* tag, unsigned int textureId, int width, int height) override
+    {
+        // copy directx texture to gl texture
+        auto gl_texture = ogl_->dispatch_sync([=] { return ogl_->copy_async(textureId, width, height, 4); });
+
+        // make gl texture to draw
+        std::vector<future_texture> textures{make_ready_future(gl_texture.get())};
+
+        std::weak_ptr<image_mixer::impl> weak_self = shared_from_this();
+        core::pixel_format_desc          desc(core::pixel_format::bgra);
+        desc.planes.push_back(core::pixel_format_desc::plane(width, height, 4));
+        auto frame = core::mutable_frame(
+            tag,
+            std::vector<array<uint8_t>>{},
+            array<int32_t>{},
+            desc,
+            [weak_self, texs = std::move(textures)](std::vector<array<const std::uint8_t>> image_data) -> boost::any {
+                auto self = weak_self.lock();
+                if (!self) {
+                    return boost::any{};
+                }
+
+                return std::make_shared<decltype(textures)>(std::move(texs));
+            });
+
+        return core::const_frame(std::move(frame));
+    }
 };
 
 image_mixer::image_mixer(const spl::shared_ptr<device>& ogl, const int channel_id, const size_t max_frame_size)
@@ -402,4 +430,10 @@ core::const_frame image_mixer::import_d3d_texture(const void*                   
     return impl_->import_d3d_texture(tag, d3d_texture, vflip, format);
 }
 #endif
+
+core::const_frame
+image_mixer::import_gl_texture(const void* video_stream_tag, unsigned int textureId, int width, int height)
+{
+    return impl_->import_gl_texture(video_stream_tag, textureId, width, height);
+}
 }}} // namespace caspar::accelerator::ogl

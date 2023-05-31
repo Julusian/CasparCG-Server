@@ -301,7 +301,7 @@ struct device::impl : public std::enable_shared_from_this<impl>
         });
     }
 
-#ifdef WIN32
+//#ifdef WIN32
     std::future<std::shared_ptr<texture>> copy_async(GLuint source, int width, int height, int stride)
     {
         return spawn_async([=](yield_context yield) {
@@ -330,7 +330,7 @@ struct device::impl : public std::enable_shared_from_this<impl>
             return tex;
         });
     }
-#endif
+//#endif
 
     boost::property_tree::wptree info() const
     {
@@ -457,11 +457,11 @@ std::future<array<const uint8_t>> device::copy_async(const std::shared_ptr<textu
 }
 #ifdef WIN32
 std::shared_ptr<void>                 device::d3d_interop() const { return impl_->interop_handle_; }
+#endif
 std::future<std::shared_ptr<texture>> device::copy_async(GLuint source, int width, int height, int stride)
 {
     return impl_->copy_async(source, width, height, stride);
 }
-#endif
 void         device::dispatch(std::function<void()> func) { boost::asio::dispatch(impl_->service_, std::move(func)); }
 std::wstring device::version() const { return impl_->version(); }
 boost::property_tree::wptree device::info() const { return impl_->info(); }

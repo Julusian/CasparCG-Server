@@ -52,6 +52,9 @@ class image_mixer final : public core::image_mixer
                                          core::pixel_format                         format) override;
 #endif
 
+    core::const_frame
+    import_gl_texture(const void* video_stream_tag, unsigned int textureId, int width, int height) override;
+
     // core::image_mixer
 
     void push(const core::frame_transform& frame) override;
