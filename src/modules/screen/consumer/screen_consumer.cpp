@@ -67,6 +67,8 @@
 #include <QOpenGLVertexArrayObject>
 #include <QOpenGLWindow>
 
+#include "../../qtwebengine/app.h"
+
 namespace caspar { namespace screen {
 
 std::unique_ptr<accelerator::ogl::shader> get_shader()
@@ -252,6 +254,8 @@ class RectangleWindow : public QOpenGLWindow
     }
     void paintGL() override
     {
+        // Note: This is run on the 'main' qt thread
+
         CASPAR_LOG(info) << "paint";
 
         // set the background color = clear color
@@ -319,7 +323,7 @@ struct screen_consumer
     std::atomic<bool> is_running_{true};
     std::thread       thread_;
 
-    RectangleWindow qt_view_;
+    RectangleWindow* qt_view_; // TODO - this should not be a pointer
 
     screen_consumer(const screen_consumer&) = delete;
     screen_consumer& operator=(const screen_consumer&) = delete;
@@ -330,15 +334,21 @@ struct screen_consumer
         , format_desc_(format_desc)
         , channel_index_(channel_index)
     {
-        QSurfaceFormat format;
-        format.setRenderableType(QSurfaceFormat::OpenGL);
-        format.setProfile(QSurfaceFormat::CoreProfile);
-        format.setVersion(3, 3);
 
-        qt_view_.setFormat(format);
-        qt_view_.setTitle("My test");
-        qt_view_.resize(640, 480);
-        qt_view_.show();
+
+        QMetaObject::invokeMethod(qtwebengine::get_qt_application(), [this]() {
+            QSurfaceFormat format;
+            format.setRenderableType(QSurfaceFormat::OpenGL);
+            format.setProfile(QSurfaceFormat::CoreProfile);
+            format.setVersion(3, 3);
+
+            qt_view_ = new RectangleWindow();
+            qt_view_->setFormat(format);
+            qt_view_->setTitle("My test");
+            qt_view_->resize(640, 480);
+            qt_view_->show();
+        });
+
 
         if (format_desc_.format == core::video_format::ntsc &&
             config_.aspect == configuration::aspect_ratio::aspect_4_3) {
@@ -551,7 +561,7 @@ struct screen_consumer
             }
         }
 
-        qt_view_.update();
+        qt_view_->update();
 
         if (!in_frame) {
             return;
