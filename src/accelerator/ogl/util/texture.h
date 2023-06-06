@@ -37,7 +37,7 @@ class texture final
     texture& operator=(texture&& other);
 
 //#ifdef WIN32
-    void copy_from(int source);
+    void copy_from(unsigned int source);
 //#endif
     void copy_from(class buffer& source);
     void copy_to(class buffer& dest);

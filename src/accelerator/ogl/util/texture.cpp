@@ -51,6 +51,7 @@ struct texture::impl
         , size_(width * height * stride)
     {
         GL(glCreateTextures(GL_TEXTURE_2D, 1, &id_));
+        CASPAR_LOG(error) << "created ccg " << id_;
         GL(glTextureParameteri(id_, GL_TEXTURE_MIN_FILTER, GL_LINEAR));
         GL(glTextureParameteri(id_, GL_TEXTURE_MAG_FILTER, GL_LINEAR));
         GL(glTextureParameteri(id_, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE));
@@ -75,7 +76,7 @@ struct texture::impl
     void clear() { GL(glClearTexImage(id_, 0, FORMAT[stride_], TYPE[stride_], nullptr)); }
 
 //#ifdef WIN32
-    void copy_from(int texture_id)
+    void copy_from(GLuint texture_id)
     {
         GL(glCopyImageSubData(
             texture_id, GL_TEXTURE_2D, 0, 0, 0, 0, id_, GL_TEXTURE_2D, 0, 0, 0, 0, width_, height_, 1));
@@ -124,7 +125,7 @@ void texture::unbind() { impl_->unbind(); }
 void texture::attach() { impl_->attach(); }
 void texture::clear() { impl_->clear(); }
 //#ifdef WIN32
-void texture::copy_from(int source) { impl_->copy_from(source); }
+void texture::copy_from(unsigned int source) { impl_->copy_from(source); }
 //#endif
 void texture::copy_from(buffer& source) { impl_->copy_from(source); }
 void texture::copy_to(buffer& dest) { impl_->copy_to(dest); }

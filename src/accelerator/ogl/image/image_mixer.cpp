@@ -388,8 +388,12 @@ struct image_mixer::impl
         // copy directx texture to gl texture
         auto gl_texture = ogl_->dispatch_sync([=] { return ogl_->copy_async(textureId, width, height, 4); });
 
+        auto tex = gl_texture.get();
+
+        CASPAR_LOG(info) << "importing " << textureId << " to " << tex->id();
+
         // make gl texture to draw
-        std::vector<future_texture> textures{make_ready_future(gl_texture.get())};
+        std::vector<future_texture> textures{make_ready_future(tex)};
 
         std::weak_ptr<image_mixer::impl> weak_self = shared_from_this();
         core::pixel_format_desc          desc(core::pixel_format::bgra);

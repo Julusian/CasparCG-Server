@@ -5,6 +5,7 @@
 #include <core/frame/draw_frame.h>
 #include <core/frame/frame.h>
 #include <core/frame/frame_factory.h>
+#include <core/frame/geometry.h>
 #include <core/frame/pixel_format.h>
 #include <core/monitor/monitor.h>
 #include <core/producer/frame_producer.h>
@@ -30,6 +31,7 @@
 #include <QOpenGLContext>
 #include <QOpenGLFramebufferObject>
 #include <QOpenGLFunctions>
+#include <QOpenGLExtraFunctions>
 #include <QQmlApplicationEngine>
 #include <QQmlComponent>
 #include <QQmlEngine>
@@ -132,19 +134,16 @@ class MyFrame
         // m_dpr = devicePixelRatio();
         textureSize_        = size;
         QOpenGLFunctions* f = context_->functions();
+        QOpenGLExtraFunctions *f2 = context_->extraFunctions();
         f->glGenTextures(1, &textureId_);
+        CASPAR_LOG(error) << "created qt " << textureId_;
         f->glBindTexture(GL_TEXTURE_2D, textureId_);
         f->glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
         f->glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        f->glTexImage2D(GL_TEXTURE_2D,
-                        0,
-                        GL_RGBA,
-                        textureSize_.width(),
-                        textureSize_.height(),
-                        0,
-                        GL_RGBA,
-                        GL_UNSIGNED_BYTE,
-                        nullptr);
+        GL(f2->glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA8,
+                              textureSize_.width(),
+                              textureSize_.height()));
+
     }
 
     void destroyTexture()
@@ -236,12 +235,12 @@ class qtwebengine_view
 
         if (my_frame_->textureId_ == 0) {
             // Ensure frame has been created
-           // my_frame_->createTexture(window_.size());
+            my_frame_->createTexture(window_.size());
         }
 
         // TODO - this is needed to bind frame2 to be drawn to (in theory)
-        // my_frame_->bind(&window_);
-        window_.setRenderTarget(QQuickRenderTarget::fromOpenGLTexture(fbo_->texture(), fbo_->size()));
+        my_frame_->bind(&window_);
+        // window_.setRenderTarget(QQuickRenderTarget::fromOpenGLTexture(fbo_->texture(), fbo_->size()));
 
         // Polish, synchronize and render the next frame (into our texture).  In this example
         // everything happens on the same thread and therefore all three steps are performed
@@ -254,27 +253,28 @@ class qtwebengine_view
         control_.endFrame();
 
         // window_.resetOpenGLState();
-        //QOpenGLFramebufferObject::bindDefault();
+        // QOpenGLFramebufferObject::bindDefault();
 
         QOpenGLFunctions* f = context_->functions();
+        QOpenGLExtraFunctions *f2 = context_->extraFunctions();
 
-        auto fence = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+        {
+            auto fence = f2->glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
 
-        f->glFlush();
+            f->glFlush();
 
-        // No errors, but using this frame gives only black
+            // No errors, but using this frame gives only black
 
-        while (fence != nullptr) {
-            auto wait = glClientWaitSync(fence, 0, 0);
-            if (wait == GL_ALREADY_SIGNALED || wait == GL_CONDITION_SATISFIED) {
-                glDeleteSync(fence);
-                fence = nullptr;
+            while (fence != nullptr) {
+                auto wait = f2->glClientWaitSync(fence, 0, 0);
+                if (wait == GL_ALREADY_SIGNALED || wait == GL_CONDITION_SATISFIED) {
+                    f2->glDeleteSync(fence);
+                    fence = nullptr;
+                }
+
+                std::this_thread::sleep_for(std::chrono::milliseconds(2));
             }
-
-            std::this_thread::sleep_for(std::chrono::milliseconds(2));
         }
-
-        glDeleteSync(fence);
 
         if (!fbo_) {
             CASPAR_LOG(debug) << "no fbo";
@@ -283,21 +283,39 @@ class qtwebengine_view
 
         CASPAR_LOG(debug) << "render fbo" << fbo_->texture();
 
-        QImage image  = fbo_->toImage();
-        int    width  = image.width();
-        int    height = image.height();
+        int width  = my_frame_->textureSize_.width();
+        int height = my_frame_->textureSize_.height();
 
         core::pixel_format_desc pixel_desc;
-        pixel_desc.format = core::pixel_format::bgra;
+        pixel_desc.format = core::pixel_format::rgba;
         pixel_desc.planes.emplace_back(width, height, 4);
 
-        auto frame2 = frame_factory_->import_gl_texture(this, fbo_->texture(), fbo_->width(), fbo_->height());
+        auto frame2 = frame_factory_->import_gl_texture(
+            this, my_frame_->textureId_, my_frame_->textureSize_.width(), my_frame_->textureSize_.height());
 
-        auto                 frame  = frame_factory_->create_frame(this, pixel_desc);
-        const unsigned char* buffer = image.bits();
-        // std::memcpy(frame.image_data(0).begin(), buffer, width * height * 4);
+        {
 
-        GL(f->glBindTexture(GL_TEXTURE_2D, fbo_->texture()));
+            auto fence = f2->glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+
+            f->glFlush();
+
+            // No errors, but using this frame gives only black
+
+            while (fence != nullptr) {
+                auto wait = f2->glClientWaitSync(fence, 0, 0);
+                if (wait == GL_ALREADY_SIGNALED || wait == GL_CONDITION_SATISFIED) {
+                    f2->glDeleteSync(fence);
+                    fence = nullptr;
+                }
+
+                std::this_thread::sleep_for(std::chrono::milliseconds(2));
+            }
+        }
+
+        auto frame = frame_factory_->create_frame(this, pixel_desc);
+        frame.geometry() = core::frame_geometry::get_default_vflip();
+
+        GL(f->glBindTexture(GL_TEXTURE_2D, my_frame_->textureId_));
 
         GL(f->glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, frame.image_data(0).begin()));
 
