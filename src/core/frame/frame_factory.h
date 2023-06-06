@@ -51,7 +51,7 @@ class frame_factory
 #endif
 
     virtual class const_frame
-    import_gl_texture(const void* video_stream_tag, unsigned int textureId, int width, int height) = 0;
+    import_gl_texture(const void* video_stream_tag, unsigned int textureId, int width, int height, bool vflip) = 0;
 };
 
 }} // namespace caspar::core

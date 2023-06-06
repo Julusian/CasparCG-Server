@@ -262,35 +262,10 @@ class qtwebengine_view
         // window_.resetOpenGLState();
         // QOpenGLFramebufferObject::bindDefault();
 
-        GL(1 == 1);
-
         QOpenGLFunctions*      f  = context_->functions();
-        QOpenGLExtraFunctions* f2 = context_->extraFunctions();
-
-        {
-            auto fence = f2->glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
-
-            f->glFlush();
-
-            // No errors, but using this frame gives only black
-
-            while (fence != nullptr) {
-                auto wait = f2->glClientWaitSync(fence, 0, 0);
-                if (wait == GL_ALREADY_SIGNALED || wait == GL_CONDITION_SATISFIED) {
-                    f2->glDeleteSync(fence);
-                    fence = nullptr;
-                }
-
-                std::this_thread::sleep_for(std::chrono::milliseconds(2));
-            }
-        }
-
-        GL(1 == 1);
 
         if (!context_->makeCurrent(&qt_frame->surface_))
             return;
-
-        GL(1 == 1);
 
         int width  = qt_frame->textureSize_.width();
         int height = qt_frame->textureSize_.height();
@@ -299,39 +274,12 @@ class qtwebengine_view
         pixel_desc.format = core::pixel_format::rgba;
         pixel_desc.planes.emplace_back(width, height, 4);
 
-         auto frame2 = frame_factory_->import_gl_texture(
-             this, qt_frame->textureId_, qt_frame->textureSize_.width(), qt_frame->textureSize_.height());
-
-        {
-            auto fence = GL2(f2->glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0));
-
-            GL(f->glFlush());
-
-            // No errors, but using this frame gives only black
-
-            while (fence != nullptr) {
-                auto wait = f2->glClientWaitSync(fence, 0, 0);
-                if (wait == GL_ALREADY_SIGNALED || wait == GL_CONDITION_SATISFIED) {
-                    GL(f2->glDeleteSync(fence));
-                    fence = nullptr;
-                }
-
-                std::this_thread::sleep_for(std::chrono::milliseconds(2));
-            }
-        }
-
-        auto frame       = frame_factory_->create_frame(this, pixel_desc);
-        frame.geometry() = core::frame_geometry::get_default_vflip();
-
-        GL(f->glBindTexture(GL_TEXTURE_2D, qt_frame->textureId_));
-
-        GL(f->glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, frame.image_data(0).begin()));
-
-        GL(f->glBindTexture(GL_TEXTURE_2D, 0));
+        auto frame2 = frame_factory_->import_gl_texture(
+            this, qt_frame->textureId_, qt_frame->textureSize_.width(), qt_frame->textureSize_.height(), true);
 
         {
             std::lock_guard<std::mutex> lock(frame_mutex_);
-            frame_ = core::draw_frame(std::move(frame));
+            frame_ = core::draw_frame(std::move(frame2));
         }
 
         graph_->set_value("render-time", timer.elapsed() * format_desc_.fps);

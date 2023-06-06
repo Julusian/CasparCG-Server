@@ -58,8 +58,11 @@ class image_mixer
                                          core::pixel_format                                      format) override = 0;
 #endif
 
-    class const_frame
-    import_gl_texture(const void* video_stream_tag, unsigned int textureId, int width, int height) override = 0;
+    class const_frame import_gl_texture(const void*  video_stream_tag,
+                                        unsigned int textureId,
+                                        int          width,
+                                        int          height,
+                                        bool         vflip) override = 0;
 };
 
 }} // namespace caspar::core

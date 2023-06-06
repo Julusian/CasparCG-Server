@@ -383,7 +383,8 @@ struct image_mixer::impl
     }
 #endif
 
-    core::const_frame import_gl_texture(const void* tag, unsigned int textureId, int width, int height) override
+    core::const_frame
+    import_gl_texture(const void* tag, unsigned int textureId, int width, int height, bool vflip) override
     {
         // copy directx texture to gl texture
         auto gl_texture = ogl_->dispatch_sync([=] { return ogl_->copy_async(textureId, width, height, 4); });
@@ -411,6 +412,10 @@ struct image_mixer::impl
 
                 return std::make_shared<decltype(textures)>(std::move(texs));
             });
+
+        if (vflip) {
+            frame.geometry() = core::frame_geometry::get_default_vflip();
+        }
 
         return core::const_frame(std::move(frame));
     }
@@ -446,8 +451,8 @@ core::const_frame image_mixer::import_d3d_texture(const void*                   
 #endif
 
 core::const_frame
-image_mixer::import_gl_texture(const void* video_stream_tag, unsigned int textureId, int width, int height)
+image_mixer::import_gl_texture(const void* video_stream_tag, unsigned int textureId, int width, int height, bool vflip)
 {
-    return impl_->import_gl_texture(video_stream_tag, textureId, width, height);
+    return impl_->import_gl_texture(video_stream_tag, textureId, width, height, vflip);
 }
 }}} // namespace caspar::accelerator::ogl
