@@ -335,7 +335,7 @@ struct screen_consumer
         , channel_index_(channel_index)
     {
 
-
+    /*
         QMetaObject::invokeMethod(qtwebengine::get_qt_application(), [this]() {
             QSurfaceFormat format;
             format.setRenderableType(QSurfaceFormat::OpenGL);
@@ -348,6 +348,7 @@ struct screen_consumer
             qt_view_->resize(640, 480);
             qt_view_->show();
         });
+        */
 
 
         if (format_desc_.format == core::video_format::ntsc &&
@@ -561,7 +562,7 @@ struct screen_consumer
             }
         }
 
-        qt_view_->update();
+        //qt_view_->update();
 
         if (!in_frame) {
             return;

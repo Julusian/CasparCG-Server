@@ -23,6 +23,8 @@
 
 #include <tbb/concurrent_queue.h>
 
+#include <GL/glew.h>
+
 #include <QGuiApplication>
 #include <QOffscreenSurface>
 #include <QOpenGLContext>
@@ -45,6 +47,7 @@
 #include <QtWebEngineQuick/qtwebenginequickglobal.h>
 
 #include <atomic>
+#include <common/gl/gl_check.h>
 #include <utility>
 
 #include "../app.h"
@@ -88,7 +91,7 @@ class MyFrame
     uint  textureId_ = 0;
     QSize textureSize_;
 
-    explicit MyFrame(std::shared_ptr<QOpenGLContext>  context)
+    explicit MyFrame(std::shared_ptr<QOpenGLContext> context)
         : context_(std::move(context))
     {
         // Pass m_context->format(), not format. Format does not specify and color buffer
@@ -105,6 +108,9 @@ class MyFrame
         context_->makeCurrent(&surface_);
 
         destroyTexture();
+
+        //  surface_.destroy();
+        context_->doneCurrent();
     }
 
     /*
@@ -149,6 +155,7 @@ class MyFrame
 
     void bind(QQuickWindow* window)
     {
+        CASPAR_LOG(info) << "bind " << textureId_ << " " << textureSize_.width() << "x" << textureSize_.height();
         window->setRenderTarget(QQuickRenderTarget::fromOpenGLTexture(textureId_, textureSize_));
     }
 };
@@ -187,13 +194,17 @@ class qtwebengine_view
         if (!context_->makeCurrent(&my_frame_->surface_))
             return;
 
-        // my_frame_->createTexture(QSize(format_desc_.width, format_desc_.height));
+        my_frame_->createTexture(QSize(format_desc_.width, format_desc_.height));
         //         auto v = QQuickRenderTarget::fromOpenGLTexture();
 
         fbo_ = std::make_unique<QOpenGLFramebufferObject>(QSize(format_desc_.width, format_desc_.height),
-                                                          QOpenGLFramebufferObject::CombinedDepthStencil);
+                                                          QOpenGLFramebufferObject::CombinedDepthStencil,
+                                                          GL_TEXTURE_2D,
+                                                          GL_RGBA);
 
-        window_.setRenderTarget(QQuickRenderTarget::fromOpenGLTexture(fbo_->texture(), fbo_->size()));
+        // window_.setRenderTarget(QQuickRenderTarget::fromOpenGLTexture(fbo_->texture(), fbo_->size()));
+        // window_.setRenderTarget(QQuickRenderTarget::fromOpenGLTexture(my_frame_->textureId_,
+        // my_frame_->textureSize_));
     }
 
     void destroyFbo()
@@ -201,7 +212,7 @@ class qtwebengine_view
         if (!context_->makeCurrent(&my_frame_->surface_))
             return;
 
-        // my_frame_->destroyTexture();
+        my_frame_->destroyTexture();
         fbo_.reset(nullptr);
     }
 
@@ -225,36 +236,52 @@ class qtwebengine_view
 
         if (my_frame_->textureId_ == 0) {
             // Ensure frame has been created
-            my_frame_->createTexture(QSize(format_desc_.width, format_desc_.height));
+           // my_frame_->createTexture(window_.size());
         }
 
-         my_frame_->bind(&window_);
+        // TODO - this is needed to bind frame2 to be drawn to (in theory)
+        // my_frame_->bind(&window_);
+        window_.setRenderTarget(QQuickRenderTarget::fromOpenGLTexture(fbo_->texture(), fbo_->size()));
 
         // Polish, synchronize and render the next frame (into our texture).  In this example
         // everything happens on the same thread and therefore all three steps are performed
         // in succession from here. In a threaded setup the render() call would happen on a
         // separate thread.
-        control_.polishItems();
         control_.beginFrame();
+        control_.polishItems();
         control_.sync();
         control_.render();
         control_.endFrame();
 
         // window_.resetOpenGLState();
-        QOpenGLFramebufferObject::bindDefault();
+        //QOpenGLFramebufferObject::bindDefault();
 
-        context_->functions()->glFlush();
+        QOpenGLFunctions* f = context_->functions();
+
+        auto fence = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+
+        f->glFlush();
 
         // No errors, but using this frame gives only black
-        auto frame2 = frame_factory_->import_gl_texture(
-            this, my_frame_->textureId_, my_frame_->textureSize_.width(), my_frame_->textureSize_.height());
+
+        while (fence != nullptr) {
+            auto wait = glClientWaitSync(fence, 0, 0);
+            if (wait == GL_ALREADY_SIGNALED || wait == GL_CONDITION_SATISFIED) {
+                glDeleteSync(fence);
+                fence = nullptr;
+            }
+
+            std::this_thread::sleep_for(std::chrono::milliseconds(2));
+        }
+
+        glDeleteSync(fence);
 
         if (!fbo_) {
             CASPAR_LOG(debug) << "no fbo";
             return;
         }
 
-        CASPAR_LOG(debug) << "render fbo";
+        CASPAR_LOG(debug) << "render fbo" << fbo_->texture();
 
         QImage image  = fbo_->toImage();
         int    width  = image.width();
@@ -264,9 +291,17 @@ class qtwebengine_view
         pixel_desc.format = core::pixel_format::bgra;
         pixel_desc.planes.emplace_back(width, height, 4);
 
+        auto frame2 = frame_factory_->import_gl_texture(this, fbo_->texture(), fbo_->width(), fbo_->height());
+
         auto                 frame  = frame_factory_->create_frame(this, pixel_desc);
         const unsigned char* buffer = image.bits();
-        std::memcpy(frame.image_data(0).begin(), buffer, width * height * 4);
+        // std::memcpy(frame.image_data(0).begin(), buffer, width * height * 4);
+
+        GL(f->glBindTexture(GL_TEXTURE_2D, fbo_->texture()));
+
+        GL(f->glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, frame.image_data(0).begin()));
+
+        GL(f->glBindTexture(GL_TEXTURE_2D, 0));
 
         {
             std::lock_guard<std::mutex> lock(frame_mutex_);
@@ -398,7 +433,14 @@ class qtwebengine_view
         format.setDepthBufferSize(16);
         format.setStencilBufferSize(8);
 
+        auto native_context_id = frame_factory_->hack_context_id();
+        CASPAR_LOG(info) << L"Have native context id: " << native_context_id;
+        CASPAR_ASSERT(native_context != 0);
+
+        auto parent_share_context = QNativeInterface::QGLXContext::fromNative((GLXContext)native_context_id);
+
         context_ = std::make_shared<QOpenGLContext>();
+        context_->setShareContext(parent_share_context);
         context_->setFormat(format);
         context_->create();
 

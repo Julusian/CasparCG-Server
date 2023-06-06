@@ -45,6 +45,8 @@ class image_mixer
     void visit(const class const_frame& frame) override     = 0;
     void pop() override                                     = 0;
 
+    virtual unsigned long long hack_context_id() override = 0;
+
     virtual std::future<array<const uint8_t>> operator()(const struct video_format_desc& format_desc) = 0;
 
     class mutable_frame create_frame(const void* tag, const struct pixel_format_desc& desc) override = 0;

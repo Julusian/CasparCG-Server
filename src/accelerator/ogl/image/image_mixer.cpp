@@ -47,6 +47,9 @@
 #include <algorithm>
 #include <vector>
 
+#include <GL/glxew.h>
+#include <SFML/Window/Context.hpp>
+
 namespace caspar { namespace accelerator { namespace ogl {
 
 using future_texture = std::shared_future<std::shared_ptr<texture>>;
@@ -246,6 +249,11 @@ struct image_mixer::impl
         CASPAR_LOG(info) << L"Initialized OpenGL Accelerated GPU Image Mixer for channel " << channel_id;
     }
 
+    unsigned long long hack_context_id() override
+    {
+        return ogl_->dispatch_sync([]() { return (unsigned long long)glXGetCurrentContext(); });
+    }
+
     void push(const core::frame_transform& transform)
     {
         auto previous_layer_depth = transform_stack_.back().layer_depth;
@@ -420,6 +428,8 @@ core::mutable_frame image_mixer::create_frame(const void* tag, const core::pixel
 {
     return impl_->create_frame(tag, desc);
 }
+
+unsigned long long image_mixer::hack_context_id() { return impl_->hack_context_id(); }
 
 #ifdef WIN32
 core::const_frame image_mixer::import_d3d_texture(const void*                                tag,

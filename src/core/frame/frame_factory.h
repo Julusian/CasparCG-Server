@@ -39,6 +39,8 @@ class frame_factory
 
     frame_factory(const frame_factory&) = delete;
 
+    virtual unsigned long long hack_context_id() = 0;
+
     virtual class mutable_frame create_frame(const void* video_stream_tag, const struct pixel_format_desc& desc) = 0;
 
 #ifdef WIN32
