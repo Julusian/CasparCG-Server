@@ -34,21 +34,24 @@ static GLenum TYPE[] = {0, GL_UNSIGNED_BYTE, GL_UNSIGNED_BYTE, GL_UNSIGNED_BYTE,
 
 struct texture::impl
 {
-    GLuint  id_     = 0;
-    GLsizei width_  = 0;
-    GLsizei height_ = 0;
-    GLsizei stride_ = 0;
-    GLsizei size_   = 0;
+    bool    external_ = false;
+    GLuint  id_       = 0;
+    GLsizei width_    = 0;
+    GLsizei height_   = 0;
+    GLsizei stride_   = 0;
+    GLsizei size_     = 0;
 
-    impl(const impl&)            = delete;
+    impl(const impl&) = delete;
     impl& operator=(const impl&) = delete;
 
   public:
     impl(int width, int height, int stride)
-        : width_(width)
+        : external_(false)
+        , width_(width)
         , height_(height)
         , stride_(stride)
         , size_(width * height * stride)
+
     {
         GL(glCreateTextures(GL_TEXTURE_2D, 1, &id_));
         CASPAR_LOG(error) << "created ccg " << id_;
@@ -59,7 +62,21 @@ struct texture::impl
         GL(glTextureStorage2D(id_, 1, INTERNAL_FORMAT[stride_], width_, height_));
     }
 
-    ~impl() { glDeleteTextures(1, &id_); }
+    impl(unsigned int texture_id, int width, int height, int stride)
+        : external_(true)
+        , id_(texture_id)
+        , width_(width)
+        , height_(height)
+        , stride_(stride)
+    {
+    }
+
+    ~impl()
+    {
+        if (!external_) {
+            glDeleteTextures(1, &id_);
+        }
+    }
 
     void bind() { GL(glBindTexture(GL_TEXTURE_2D, id_)); }
 
@@ -75,13 +92,13 @@ struct texture::impl
 
     void clear() { GL(glClearTexImage(id_, 0, FORMAT[stride_], TYPE[stride_], nullptr)); }
 
-//#ifdef WIN32
+    //#ifdef WIN32
     void copy_from(GLuint texture_id)
     {
         GL(glCopyImageSubData(
             texture_id, GL_TEXTURE_2D, 0, 0, 0, 0, id_, GL_TEXTURE_2D, 0, 0, 0, 0, width_, height_, 1));
     }
-//#endif
+    //#endif
 
     void copy_from(buffer& src)
     {
@@ -108,6 +125,10 @@ struct texture::impl
 
 texture::texture(int width, int height, int stride)
     : impl_(new impl(width, height, stride))
+{
+}
+texture::texture(unsigned int texture_id, int width, int height, int stride)
+    : impl_(new impl(texture_id, width, height, stride))
 {
 }
 texture::texture(texture&& other)

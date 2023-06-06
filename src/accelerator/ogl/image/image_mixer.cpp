@@ -386,12 +386,7 @@ struct image_mixer::impl
     core::const_frame
     import_gl_texture(const void* tag, unsigned int textureId, int width, int height, bool vflip) override
     {
-        // copy directx texture to gl texture
-        auto gl_texture = ogl_->dispatch_sync([=] { return ogl_->copy_async(textureId, width, height, 4); });
-
-        auto tex = gl_texture.get();
-
-        CASPAR_LOG(info) << "importing " << textureId << " to " << tex->id();
+        auto tex = std::make_shared<texture>(textureId, width, height, 4);
 
         // make gl texture to draw
         std::vector<future_texture> textures{make_ready_future(tex)};
