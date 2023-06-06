@@ -33,8 +33,6 @@
 
 #include <GL/glew.h>
 
-#include <SFML/Window/Context.hpp>
-
 #ifdef WIN32
 #include "../../d3d/d3d_device.h"
 #include <GL/wglew.h>
@@ -48,9 +46,14 @@
 #include <tbb/concurrent_queue.h>
 #include <tbb/concurrent_unordered_map.h>
 
+#include <QOffscreenSurface>
+#include <QOpenGLContext>
+
 #include <array>
 #include <future>
 #include <thread>
+
+#include "../../../modules/qtwebengine/app.h"
 
 namespace caspar { namespace accelerator { namespace ogl {
 
@@ -61,7 +64,8 @@ struct device::impl : public std::enable_shared_from_this<impl>
     using texture_queue_t = tbb::concurrent_bounded_queue<std::shared_ptr<texture>>;
     using buffer_queue_t  = tbb::concurrent_bounded_queue<std::shared_ptr<buffer>>;
 
-    sf::Context device_;
+    QOpenGLContext*   context_;
+    QOffscreenSurface surface_;
 
     std::array<tbb::concurrent_unordered_map<size_t, texture_queue_t>, 4> device_pools_;
     std::array<tbb::concurrent_unordered_map<size_t, buffer_queue_t>, 2>  host_pools_;
@@ -84,61 +88,92 @@ struct device::impl : public std::enable_shared_from_this<impl>
     std::thread                         thread_;
 
     impl()
-        : device_(sf::ContextSettings(0, 0, 0, 4, 5, sf::ContextSettings::Attribute::Core), 1, 1)
-        , work_(make_work_guard(service_))
+        : work_(make_work_guard(service_))
     {
         CASPAR_LOG(info) << L"Initializing OpenGL Device.";
 
-        device_.setActive(true);
-
-        if (glewInit() != GLEW_OK) {
-            CASPAR_THROW_EXCEPTION(gl::ogl_exception() << msg_info("Failed to initialize GLEW."));
-        }
-
-#ifdef WIN32
-        if (wglewInit() != GLEW_OK) {
-            CASPAR_THROW_EXCEPTION(gl::ogl_exception() << msg_info("Failed to initialize GLEW."));
-        }
-#endif
-
-        version_ = u16(reinterpret_cast<const char*>(GL2(glGetString(GL_VERSION)))) + L" " +
-                   u16(reinterpret_cast<const char*>(GL2(glGetString(GL_VENDOR))));
-
-        CASPAR_LOG(info) << L"Initialized OpenGL " << version();
-
-        if (!GLEW_VERSION_4_5 && !glewIsSupported("GL_ARB_sync GL_ARB_shader_objects GL_ARB_multitexture "
-                                                  "GL_ARB_direct_state_access GL_ARB_texture_barrier")) {
-            CASPAR_THROW_EXCEPTION(not_supported()
-                                   << msg_info("Your graphics card does not meet the minimum hardware requirements "
-                                               "since it does not support OpenGL 4.5 or higher."));
-        }
-
-        GL(glCreateFramebuffers(1, &fbo_));
-        GL(glBindFramebuffer(GL_FRAMEBUFFER, fbo_));
-
-        device_.setActive(false);
-
-#ifdef WIN32
-        if (env::properties().get(L"configuration.html.enable-gpu", false)) {
-            d3d_device_ = d3d::d3d_device::get_device();
-        }
-        if (d3d_device_) {
-            interop_handle_ = std::shared_ptr<void>(wglDXOpenDeviceNV(d3d_device_->device()), [](void* p) {
-                if (p)
-                    wglDXCloseDeviceNV(p);
-            });
-
-            if (!interop_handle_)
-                CASPAR_THROW_EXCEPTION(gl::ogl_exception() << msg_info("Failed to initialize d3d interop."));
-        }
-#endif
+        std::mutex              opengl_ready_mutex;
+        bool                    opengl_ready = false;
+        std::condition_variable opengl_ready_condition;
 
         thread_ = std::thread([&] {
-            device_.setActive(true);
+            // QMetaObject::invokeMethod(qtwebengine::get_qt_application(), [this]() {
+            QSurfaceFormat format;
+            // Qt Quick may need a depth and stencil buffer. Always make sure these are available.
+            format.setDepthBufferSize(16);
+            format.setStencilBufferSize(8);
+
+            context_ = new QOpenGLContext();
+            context_->setFormat(format);
+            context_->create();
+
+            surface_.setFormat(context_->format());
+            surface_.create();
+
+            context_->doneCurrent();
+            // });
+
+            context_->makeCurrent(&surface_);
+
+            if (glewInit() != GLEW_OK) {
+                CASPAR_THROW_EXCEPTION(gl::ogl_exception() << msg_info("Failed to initialize GLEW."));
+            }
+
+#ifdef WIN32
+            if (wglewInit() != GLEW_OK) {
+                CASPAR_THROW_EXCEPTION(gl::ogl_exception() << msg_info("Failed to initialize GLEW."));
+            }
+#endif
+
+            version_ = u16(reinterpret_cast<const char*>(GL2(glGetString(GL_VERSION)))) + L" " +
+                       u16(reinterpret_cast<const char*>(GL2(glGetString(GL_VENDOR))));
+
+            CASPAR_LOG(info) << L"Initialized OpenGL " << version();
+
+            if (!GLEW_VERSION_4_5 && !glewIsSupported("GL_ARB_sync GL_ARB_shader_objects GL_ARB_multitexture "
+                                                      "GL_ARB_direct_state_access GL_ARB_texture_barrier")) {
+                CASPAR_THROW_EXCEPTION(not_supported()
+                                       << msg_info("Your graphics card does not meet the minimum hardware requirements "
+                                                   "since it does not support OpenGL 4.5 or higher."));
+            }
+
+            GL(glCreateFramebuffers(1, &fbo_));
+            GL(glBindFramebuffer(GL_FRAMEBUFFER, fbo_));
+
+            //  context_->doneCurrent();
+
+#ifdef WIN32
+            if (env::properties().get(L"configuration.html.enable-gpu", false)) {
+                d3d_device_ = d3d::d3d_device::get_device();
+            }
+            if (d3d_device_) {
+                interop_handle_ = std::shared_ptr<void>(wglDXOpenDeviceNV(d3d_device_->device()), [](void* p) {
+                    if (p)
+                        wglDXCloseDeviceNV(p);
+                });
+
+                if (!interop_handle_)
+                    CASPAR_THROW_EXCEPTION(gl::ogl_exception() << msg_info("Failed to initialize d3d interop."));
+            }
+#endif
+
+            {
+                opengl_ready = true;
+                // TODO - does this need to aquire opengl_ready_mutex?
+                opengl_ready_condition.notify_all();
+            }
+
+            //  context_->makeCurrent(&surface_);
             set_thread_name(L"OpenGL Device");
             service_.run();
-            device_.setActive(false);
+            context_->doneCurrent();
         });
+
+        {
+            // Wait for opengl to be ready.
+            std::unique_lock<std::mutex> lock(opengl_ready_mutex);
+            opengl_ready_condition.wait(lock, [&]() { return opengl_ready; });
+        }
     }
 
     ~impl()
@@ -146,7 +181,7 @@ struct device::impl : public std::enable_shared_from_this<impl>
         work_.reset();
         thread_.join();
 
-        device_.setActive(true);
+        context_->makeCurrent(&surface_);
 
         for (auto& pool : host_pools_)
             pool.clear();
@@ -301,7 +336,7 @@ struct device::impl : public std::enable_shared_from_this<impl>
         });
     }
 
-//#ifdef WIN32
+    //#ifdef WIN32
     std::future<std::shared_ptr<texture>> copy_async(GLuint source, int width, int height, int stride)
     {
         return spawn_async([=](yield_context yield) {
@@ -330,7 +365,7 @@ struct device::impl : public std::enable_shared_from_this<impl>
             return tex;
         });
     }
-//#endif
+    //#endif
 
     boost::property_tree::wptree info() const
     {
@@ -456,7 +491,7 @@ std::future<array<const uint8_t>> device::copy_async(const std::shared_ptr<textu
     return impl_->copy_async(source);
 }
 #ifdef WIN32
-std::shared_ptr<void>                 device::d3d_interop() const { return impl_->interop_handle_; }
+std::shared_ptr<void> device::d3d_interop() const { return impl_->interop_handle_; }
 #endif
 std::future<std::shared_ptr<texture>> device::copy_async(GLuint source, int width, int height, int stride)
 {

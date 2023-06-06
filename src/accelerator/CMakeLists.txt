@@ -70,3 +70,7 @@ source_group(sources\\ogl\\util ogl/util/.*)
 source_group(sources\\d3d d3d/.*)
 
 target_link_libraries(accelerator common core)
+target_link_libraries(accelerator  Qt::Core
+		Qt::Gui
+		Qt::OpenGL)
+
