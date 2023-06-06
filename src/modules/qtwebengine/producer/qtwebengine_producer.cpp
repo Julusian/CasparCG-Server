@@ -21,6 +21,7 @@
 #include <boost/property_tree/ptree.hpp>
 #include <boost/timer.hpp>
 #include <memory>
+#include <queue>
 
 #include <tbb/concurrent_queue.h>
 
@@ -29,9 +30,9 @@
 #include <QGuiApplication>
 #include <QOffscreenSurface>
 #include <QOpenGLContext>
+#include <QOpenGLExtraFunctions>
 #include <QOpenGLFramebufferObject>
 #include <QOpenGLFunctions>
-#include <QOpenGLExtraFunctions>
 #include <QQmlApplicationEngine>
 #include <QQmlComponent>
 #include <QQmlEngine>
@@ -132,18 +133,15 @@ class MyFrame
         // The scene graph has been initialized. It is now time to create an texture and associate
         // it with the QQuickWindow.
         // m_dpr = devicePixelRatio();
-        textureSize_        = size;
-        QOpenGLFunctions* f = context_->functions();
-        QOpenGLExtraFunctions *f2 = context_->extraFunctions();
+        textureSize_              = size;
+        QOpenGLFunctions*      f  = context_->functions();
+        QOpenGLExtraFunctions* f2 = context_->extraFunctions();
         f->glGenTextures(1, &textureId_);
         CASPAR_LOG(error) << "created qt " << textureId_;
         f->glBindTexture(GL_TEXTURE_2D, textureId_);
         f->glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
         f->glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        GL(f2->glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA8,
-                              textureSize_.width(),
-                              textureSize_.height()));
-
+        GL(f2->glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA8, textureSize_.width(), textureSize_.height()));
     }
 
     void destroyTexture()
@@ -154,7 +152,7 @@ class MyFrame
 
     void bind(QQuickWindow* window)
     {
-        CASPAR_LOG(info) << "bind " << textureId_ << " " << textureSize_.width() << "x" << textureSize_.height();
+        // CASPAR_LOG(info) << "bind " << textureId_ << " " << textureSize_.width() << "x" << textureSize_.height();
         window->setRenderTarget(QQuickRenderTarget::fromOpenGLTexture(textureId_, textureSize_));
     }
 };
@@ -169,11 +167,13 @@ class qtwebengine_view
 
     QQuickRenderControl             control_;
     std::shared_ptr<QOpenGLContext> context_;
+    std::shared_ptr<QOpenGLContext> parent_context_;
     QQmlEngine                      engine_;
     QQuickWindow                    window_;
     std::unique_ptr<QQmlComponent>  qmlComponent_;
 
-    MyFrame* my_frame_;
+    std::queue<std::shared_ptr<MyFrame>> frames_;
+    // MyFrame* my_frame_;
 
     spl::shared_ptr<diagnostics::graph> graph_;
 
@@ -183,36 +183,30 @@ class qtwebengine_view
     std::unique_ptr<QWebEnginePage> web_page_;
     // std::unique_ptr<QWebEngineView> web_view_;
 
-    std::unique_ptr<QOpenGLFramebufferObject> fbo_;
-
     mutable std::mutex frame_mutex_;
     core::draw_frame   frame_;
 
-    void createFbo()
+    void createFrames()
     {
-        if (!context_->makeCurrent(&my_frame_->surface_))
-            return;
+        // TODO - target count?
+        for (int i = 0; i < 6; ++i) {
+            auto frame = std::make_shared<MyFrame>(context_);
+            frame->createTexture(QSize(format_desc_.width, format_desc_.height)); // TODO?
+            frames_.push(std::move(frame));
+        }
 
-        my_frame_->createTexture(QSize(format_desc_.width, format_desc_.height));
-        //         auto v = QQuickRenderTarget::fromOpenGLTexture();
-
-        fbo_ = std::make_unique<QOpenGLFramebufferObject>(QSize(format_desc_.width, format_desc_.height),
-                                                          QOpenGLFramebufferObject::CombinedDepthStencil,
-                                                          GL_TEXTURE_2D,
-                                                          GL_RGBA);
-
-        // window_.setRenderTarget(QQuickRenderTarget::fromOpenGLTexture(fbo_->texture(), fbo_->size()));
         // window_.setRenderTarget(QQuickRenderTarget::fromOpenGLTexture(my_frame_->textureId_,
         // my_frame_->textureSize_));
     }
 
-    void destroyFbo()
+    void destroyFrames()
     {
-        if (!context_->makeCurrent(&my_frame_->surface_))
-            return;
+        while (!frames_.empty()) {
+            auto frame = frames_.front();
+            frames_.pop();
 
-        my_frame_->destroyTexture();
-        fbo_.reset(nullptr);
+            frame->destroyTexture();
+        }
     }
 
     void requestUpdate()
@@ -225,22 +219,35 @@ class qtwebengine_view
 
     void render()
     {
-        CASPAR_LOG(debug) << "rrender " << my_frame_->textureId_ << " " << QThread::currentThread();
+        if (frames_.empty()) {
+            CASPAR_LOG(error) << "no frames";
+            return;
+        }
+
+        auto qt_frame = frames_.front();
+        frames_.pop();
+        frames_.push(qt_frame); // TODO - proper ownership
+
+        // CASPAR_LOG(debug) << "rrender " << qt_frame->textureId_ << " " << QThread::currentThread();
 
         boost::timer timer;
         timer.restart();
 
-        if (!context_->makeCurrent(&my_frame_->surface_))
+        if (!context_->makeCurrent(&qt_frame->surface_))
             return;
 
-        if (my_frame_->textureId_ == 0) {
+        GL(1 == 1);
+
+        if (qt_frame->textureId_ == 0) {
             // Ensure frame has been created
-            my_frame_->createTexture(window_.size());
+            qt_frame->createTexture(window_.size());
         }
 
-        // TODO - this is needed to bind frame2 to be drawn to (in theory)
-        my_frame_->bind(&window_);
-        // window_.setRenderTarget(QQuickRenderTarget::fromOpenGLTexture(fbo_->texture(), fbo_->size()));
+        GL(1 == 1);
+
+        qt_frame->bind(&window_);
+
+        GL(1 == 1);
 
         // Polish, synchronize and render the next frame (into our texture).  In this example
         // everything happens on the same thread and therefore all three steps are performed
@@ -255,8 +262,10 @@ class qtwebengine_view
         // window_.resetOpenGLState();
         // QOpenGLFramebufferObject::bindDefault();
 
-        QOpenGLFunctions* f = context_->functions();
-        QOpenGLExtraFunctions *f2 = context_->extraFunctions();
+        GL(1 == 1);
+
+        QOpenGLFunctions*      f  = context_->functions();
+        QOpenGLExtraFunctions* f2 = context_->extraFunctions();
 
         {
             auto fence = f2->glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
@@ -276,35 +285,34 @@ class qtwebengine_view
             }
         }
 
-        if (!fbo_) {
-            CASPAR_LOG(debug) << "no fbo";
+        GL(1 == 1);
+
+        if (!context_->makeCurrent(&qt_frame->surface_))
             return;
-        }
 
-        CASPAR_LOG(debug) << "render fbo" << fbo_->texture();
+        GL(1 == 1);
 
-        int width  = my_frame_->textureSize_.width();
-        int height = my_frame_->textureSize_.height();
+        int width  = qt_frame->textureSize_.width();
+        int height = qt_frame->textureSize_.height();
 
         core::pixel_format_desc pixel_desc;
         pixel_desc.format = core::pixel_format::rgba;
         pixel_desc.planes.emplace_back(width, height, 4);
 
-        auto frame2 = frame_factory_->import_gl_texture(
-            this, my_frame_->textureId_, my_frame_->textureSize_.width(), my_frame_->textureSize_.height());
+         auto frame2 = frame_factory_->import_gl_texture(
+             this, qt_frame->textureId_, qt_frame->textureSize_.width(), qt_frame->textureSize_.height());
 
         {
+            auto fence = GL2(f2->glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0));
 
-            auto fence = f2->glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
-
-            f->glFlush();
+            GL(f->glFlush());
 
             // No errors, but using this frame gives only black
 
             while (fence != nullptr) {
                 auto wait = f2->glClientWaitSync(fence, 0, 0);
                 if (wait == GL_ALREADY_SIGNALED || wait == GL_CONDITION_SATISFIED) {
-                    f2->glDeleteSync(fence);
+                    GL(f2->glDeleteSync(fence));
                     fence = nullptr;
                 }
 
@@ -312,10 +320,10 @@ class qtwebengine_view
             }
         }
 
-        auto frame = frame_factory_->create_frame(this, pixel_desc);
+        auto frame       = frame_factory_->create_frame(this, pixel_desc);
         frame.geometry() = core::frame_geometry::get_default_vflip();
 
-        GL(f->glBindTexture(GL_TEXTURE_2D, my_frame_->textureId_));
+        GL(f->glBindTexture(GL_TEXTURE_2D, qt_frame->textureId_));
 
         GL(f->glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, frame.image_data(0).begin()));
 
@@ -360,7 +368,7 @@ class qtwebengine_view
         updateSizes();
 
         // Initialize the render control and our OpenGL resources.
-        context_->makeCurrent(&my_frame_->surface_);
+        context_->makeCurrent(&window_);
         window_.setGraphicsDevice(QQuickGraphicsDevice::fromOpenGLContext(context_.get()));
         control_.initialize();
 
@@ -452,17 +460,20 @@ class qtwebengine_view
         format.setStencilBufferSize(8);
 
         auto native_context_id = frame_factory_->hack_context_id();
-        CASPAR_LOG(info) << L"Have native context id: " << native_context_id;
         CASPAR_ASSERT(native_context != 0);
 
-        auto parent_share_context = QNativeInterface::QGLXContext::fromNative((GLXContext)native_context_id);
+        parent_context_.reset(QNativeInterface::QGLXContext::fromNative((GLXContext)native_context_id));
+        CASPAR_LOG(info) << L"Have native context id: " << native_context_id << " as " << parent_context_;
 
         context_ = std::make_shared<QOpenGLContext>();
-        context_->setShareContext(parent_share_context);
+        context_->setShareContext(parent_context_.get());
         context_->setFormat(format);
         context_->create();
 
-        my_frame_ = new MyFrame(context_);
+        CASPAR_LOG(info) << "are sharing: " << QOpenGLContext::areSharing(parent_context_.get(), context_.get())
+                         << " or " << QOpenGLContext::areSharing(context_.get(), parent_context_.get());
+
+        // my_frame_ = new MyFrame(context_);
 
         // window_.setColor(Qt::transparent);
         window_.setColor(QColor(255, 0, 0, 255));
@@ -475,9 +486,9 @@ class qtwebengine_view
         updateTimer_.setInterval(5);
         QObject::connect(&updateTimer_, &QTimer::timeout, [this]() { render(); });
 
-        QObject::connect(&window_, &QQuickWindow::sceneGraphInitialized, [this]() { createFbo(); });
+        QObject::connect(&window_, &QQuickWindow::sceneGraphInitialized, [this]() { createFrames(); });
 
-        QObject::connect(&window_, &QQuickWindow::sceneGraphInvalidated, [this]() { destroyFbo(); });
+        QObject::connect(&window_, &QQuickWindow::sceneGraphInvalidated, [this]() { destroyFrames(); });
         QObject::connect(&window_,
                          &QQuickWindow::sceneGraphError,
                          [this](QQuickWindow::SceneGraphError error, const QString& message) {
@@ -494,7 +505,7 @@ class qtwebengine_view
 
     ~qtwebengine_view()
     {
-        context_->makeCurrent(&my_frame_->surface_);
+        context_->makeCurrent(&window_);
         control_.invalidate();
     }
 
