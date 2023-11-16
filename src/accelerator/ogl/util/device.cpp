@@ -223,7 +223,7 @@ struct device::impl : public std::enable_shared_from_this<impl>
         std::shared_ptr<buffer> buf;
         if (!pool->try_pop(buf)) {
             // TODO (perf) Avoid blocking in create_array.
-            dispatch_sync([&] { buf = std::make_shared<buffer>(size, write); });
+            dispatch_sync([&] { buf = std::make_shared<buffer>(size, write, nullptr); });
         }
 
         auto ptr = buf.get();

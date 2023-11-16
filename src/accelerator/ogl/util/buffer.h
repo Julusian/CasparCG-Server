@@ -31,13 +31,15 @@ class buffer final
   public:
     static boost::property_tree::wptree info();
 
-    buffer(int size, bool write);
+    buffer(int size, bool write, const void* bytes);
     buffer(const buffer&) = delete;
     buffer(buffer&& other);
     ~buffer();
 
     buffer& operator=(const buffer&) = delete;
     buffer& operator=(buffer&& other);
+
+    void destroy();
 
     void bind();
     void unbind();

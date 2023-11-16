@@ -305,13 +305,8 @@ struct image_mixer::impl
         return renderer_(std::move(layers_), format_desc);
     }
 
-    core::mutable_frame create_frame(const void* tag, const core::pixel_format_desc& desc) override
+    core::mutable_frame wrap_image_data(const void* tag, const core::pixel_format_desc& desc, std::vector<caspar::array<std::uint8_t>> image_data)
     {
-        std::vector<array<std::uint8_t>> image_data;
-        for (auto& plane : desc.planes) {
-            image_data.push_back(ogl_->create_array(plane.size));
-        }
-
         std::weak_ptr<image_mixer::impl> weak_self = shared_from_this();
         return core::mutable_frame(
             tag,
@@ -330,6 +325,43 @@ struct image_mixer::impl
                 }
                 return std::make_shared<decltype(textures)>(std::move(textures));
             });
+    }
+
+    core::mutable_frame create_frame(const void* tag, const core::pixel_format_desc& desc) override
+    {
+        std::vector<array<std::uint8_t>> image_data;
+        for (auto& plane : desc.planes) {
+            image_data.push_back(ogl_->create_array(plane.size));
+        }
+
+        return wrap_image_data(tag, desc, std::move(image_data));
+    }
+
+    caspar::array<std::uint8_t> import_buffer(const void* bytes, size_t size) override {
+        if (!bytes) {
+            CASPAR_THROW_EXCEPTION(caspar_exception() << msg_info("Must provide a buffer to import"));
+        }
+
+        auto buf = ogl_->dispatch_sync([=] {
+            return std::make_shared<buffer>(size, true, bytes);
+        });
+
+        // The buffer must be freed on the ogl thread, so mangle the return to allow this
+        auto buf_ptr = buf.get();
+        auto buf_safe = std::shared_ptr<buffer>(buf_ptr, [buf = std::move(buf), self = shared_from_this()](buffer*) mutable {
+            self->ogl_->dispatch_sync([buf = std::move(buf)] {
+                buf->destroy();
+            });
+        });
+
+        auto ptr = reinterpret_cast<uint8_t*>(buf_safe->data());
+        return array<uint8_t>(ptr, buf_safe->size(), buf_safe);
+    }
+
+    core::const_frame finish_frame(const void* tag, const struct core::pixel_format_desc& desc, std::vector<caspar::array<std::uint8_t>> image_data) override
+    {
+        core::mutable_frame mut_frame = wrap_image_data(tag, desc, std::move(image_data));
+        return core::const_frame(std::move(mut_frame));
     }
 
 #ifdef WIN32
@@ -391,6 +423,14 @@ std::future<array<const std::uint8_t>> image_mixer::operator()(const core::video
 core::mutable_frame image_mixer::create_frame(const void* tag, const core::pixel_format_desc& desc)
 {
     return impl_->create_frame(tag, desc);
+}
+caspar::array<std::uint8_t> image_mixer::import_buffer(const void* bytes, size_t size)
+{
+    return impl_->import_buffer(bytes, size);
+}
+core::const_frame image_mixer::finish_frame(const void* video_stream_tag, const struct core::pixel_format_desc& desc, std::vector<caspar::array<std::uint8_t>> image_data)
+{
+    return impl_->finish_frame(video_stream_tag, desc, std::move(image_data));
 }
 
 #ifdef WIN32

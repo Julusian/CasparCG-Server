@@ -41,6 +41,11 @@ class frame_factory
 
     virtual class mutable_frame create_frame(const void* video_stream_tag, const struct pixel_format_desc& desc) = 0;
 
+    virtual caspar::array<std::uint8_t> import_buffer(const void* bytes, size_t size) = 0;
+
+    virtual class const_frame finish_frame(const void* video_stream_tag, const struct pixel_format_desc& desc, std::vector<array<std::uint8_t>> image_data) = 0;
+
+
 #ifdef WIN32
     virtual class const_frame import_d3d_texture(const void* video_stream_tag,
                                                  const std::shared_ptr<accelerator::d3d::d3d_texture2d>& d3d_texture,

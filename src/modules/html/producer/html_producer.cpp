@@ -249,15 +249,22 @@ class html_client
         if (type != PET_VIEW)
             return;
 
+
         core::pixel_format_desc pixel_desc;
         pixel_desc.format = core::pixel_format::bgra;
         pixel_desc.planes.push_back(core::pixel_format_desc::plane(width, height, 4));
 
+        caspar::array<std::uint8_t> buf = frame_factory_->import_buffer(buffer, width * height * 4);
+        std::vector<caspar::array<std::uint8_t>> image_data ;
+        image_data.push_back(std::move(buf));
+        auto frame = frame_factory_->finish_frame(this, pixel_desc, std::move(image_data));
+
+        /*
         auto frame = frame_factory_->create_frame(this, pixel_desc);
         auto src   = (char*)buffer;
         auto dst   = reinterpret_cast<char*>(frame.image_data(0).begin());
         std::memcpy(dst, src, width * height * 4);
-
+*/
         {
             std::lock_guard<std::mutex> lock(frames_mutex_);
 

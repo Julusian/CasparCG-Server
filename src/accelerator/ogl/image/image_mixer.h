@@ -45,6 +45,10 @@ class image_mixer final : public core::image_mixer
 
     std::future<array<const std::uint8_t>> operator()(const core::video_format_desc& format_desc) override;
     core::mutable_frame                    create_frame(const void* tag, const core::pixel_format_desc& desc) override;
+    caspar::array<std::uint8_t>            import_buffer(const void* bytes, size_t size) override;
+
+    core::const_frame finish_frame(const void* video_stream_tag, const struct core::pixel_format_desc& desc, std::vector<caspar::array<std::uint8_t>> image_data) override;
+
 #ifdef WIN32
     core::const_frame import_d3d_texture(const void*                                tag,
                                          const std::shared_ptr<d3d::d3d_texture2d>& d3d_texture,
