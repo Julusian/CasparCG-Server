@@ -52,6 +52,8 @@ struct stage::impl : public std::enable_shared_from_this<impl>
     std::map<int, tweened_transform>    tweens_;
     std::set<int>                       routeSources;
 
+    std::shared_ptr<channel_timecode> timecode_;
+
     mutable std::mutex      format_desc_mutex_;
     core::video_format_desc format_desc_;
 
@@ -112,8 +114,11 @@ struct stage::impl : public std::enable_shared_from_this<impl>
     impl(int channel_index, spl::shared_ptr<diagnostics::graph> graph, const core::video_format_desc& format_desc)
         : channel_index_(channel_index)
         , graph_(std::move(graph))
+        , timecode_(std::make_shared<channel_timecode>(channel_index, format_desc))
         , format_desc_(format_desc)
     {
+        // Sync the timecode with current time
+        timecode_->start();
     }
 
     const stage_frames operator()(uint64_t                                     frame_number,
@@ -121,6 +126,9 @@ struct stage::impl : public std::enable_shared_from_this<impl>
                                   std::function<void(int, const layer_frame&)> routesCb)
     {
         return executor_.invoke([=] {
+            // Predict the new timecode for any producers to use
+            timecode_->tick(false);
+
             std::map<int, layer_frame> frames;
             stage_frames               result = {};
 
@@ -218,6 +226,10 @@ struct stage::impl : public std::enable_shared_from_this<impl>
                 layers_.clear();
                 CASPAR_LOG_CURRENT_EXCEPTION();
             }
+
+            // Ensure it is accurate now the producer has run
+            result.timecode        = timecode_->tick(true);
+            result.timecode_source = timecode_->source_name();
 
             return result;
         });
@@ -474,6 +486,7 @@ std::future<void>            stage::execute(std::function<void()> func)
     func();
     return make_ready_future();
 }
+std::shared_ptr<core::channel_timecode> stage::timecode() const { return impl_->timecode_; }
 
 // STAGE DELAYED (For batching operations)
 stage_delayed::stage_delayed(std::shared_ptr<stage>& st, int index)

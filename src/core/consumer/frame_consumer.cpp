@@ -111,9 +111,9 @@ class destroy_consumer_proxy : public frame_consumer
         }).detach();
     }
 
-    std::future<bool> send(const core::video_field field, const_frame frame) override
+    std::future<bool> send(const core::video_field field, const frame_timecode timecode, const_frame frame) override
     {
-        return consumer_->send(field, std::move(frame));
+        return consumer_->send(field, std::move(timecode), std::move(frame));
     }
     void initialize(const video_format_desc& format_desc, int channel_index) override
     {
@@ -144,9 +144,9 @@ class print_consumer_proxy : public frame_consumer
         CASPAR_LOG(info) << str << L" Uninitialized.";
     }
 
-    std::future<bool> send(const core::video_field field, const_frame frame) override
+    std::future<bool> send(const core::video_field field, const frame_timecode timecode, const_frame frame) override
     {
-        return consumer_->send(field, std::move(frame));
+        return consumer_->send(field, std::move(timecode), std::move(frame));
     }
     void initialize(const video_format_desc& format_desc, int channel_index) override
     {
@@ -207,12 +207,15 @@ const spl::shared_ptr<frame_consumer>& frame_consumer::empty()
     class empty_frame_consumer : public frame_consumer
     {
       public:
-        std::future<bool> send(const core::video_field field, const_frame) override { return make_ready_future(false); }
-        void              initialize(const video_format_desc&, int) override {}
-        std::wstring      print() const override { return L"empty"; }
-        std::wstring      name() const override { return L"empty"; }
-        bool              has_synchronization_clock() const override { return false; }
-        int               index() const override { return -1; }
+        std::future<bool> send(const core::video_field field, const frame_timecode timecode, const_frame) override
+        {
+            return make_ready_future(false);
+        }
+        void                 initialize(const video_format_desc&, int) override {}
+        std::wstring         print() const override { return L"empty"; }
+        std::wstring         name() const override { return L"empty"; }
+        bool                 has_synchronization_clock() const override { return false; }
+        int                  index() const override { return -1; }
         core::monitor::state state() const override
         {
             static const monitor::state empty;

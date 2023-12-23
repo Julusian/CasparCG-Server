@@ -243,7 +243,7 @@ struct oal_consumer : public core::frame_consumer
         });
     }
 
-    std::future<bool> send(core::video_field field, core::const_frame frame) override
+    std::future<bool> send(core::video_field field, core::frame_timecode timecode, core::const_frame frame) override
     {
         executor_.begin_invoke([=] {
             auto dst            = std::shared_ptr<AVFrame>(av_frame_alloc(), [](AVFrame* ptr) { av_frame_free(&ptr); });

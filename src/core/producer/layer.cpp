@@ -106,8 +106,8 @@ struct layer::impl
     draw_frame receive(const video_field field, int nb_samples)
     {
         try {
-            if (foreground_->following_producer() != core::frame_producer::empty() && field != video_field::b) {
-                foreground_ = foreground_->following_producer();
+            if (foreground_->following_producer(false) != core::frame_producer::empty() && field != video_field::b) {
+                foreground_ = foreground_->following_producer(false);
             }
 
             int64_t frames_left = 0;

@@ -84,9 +84,10 @@ class transition_producer : public frame_producer
 
     void leading_producer(const spl::shared_ptr<frame_producer>& producer) override { src_producer_ = producer; }
 
-    spl::shared_ptr<frame_producer> following_producer() const override
+    spl::shared_ptr<frame_producer> following_producer(bool peek) const override
     {
-        return current_frame_ >= info_.duration && dst_is_ready_ ? dst_producer_ : core::frame_producer::empty();
+        return peek || (current_frame_ >= info_.duration && dst_is_ready_) ? dst_producer_
+                                                                           : core::frame_producer::empty();
     }
 
     boost::optional<int64_t> auto_play_delta() const override { return info_.duration; }
@@ -202,6 +203,10 @@ class transition_producer : public frame_producer
     }
 
     core::monitor::state state() const override { return state_; }
+
+    const frame_timecode& timecode() override { return dst_producer_->timecode(); }
+    bool                  has_timecode() override { return dst_producer_->has_timecode(); }
+    bool                  provides_timecode() override { return dst_producer_->provides_timecode(); }
 };
 
 spl::shared_ptr<frame_producer> create_transition_producer(const spl::shared_ptr<frame_producer>& destination,

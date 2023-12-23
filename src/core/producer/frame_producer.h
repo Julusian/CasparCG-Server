@@ -23,6 +23,7 @@
 
 #include "../fwd.h"
 #include "../monitor/monitor.h"
+#include "timecode_source.h"
 
 #include <common/except.h>
 #include <common/memory.h>
@@ -41,7 +42,7 @@
 
 namespace caspar { namespace core {
 
-class frame_producer
+class frame_producer : public timecode_source
 {
     frame_producer(const frame_producer&);
     frame_producer& operator=(const frame_producer&);
@@ -104,9 +105,17 @@ class frame_producer
         }
         return core::draw_frame::still(first_frame_);
     }
+
+    virtual const frame_timecode& timecode() { return frame_timecode::empty(); }
+    virtual bool                  has_timecode() { return false; }
+    virtual bool                  provides_timecode() { return false; }
+
     virtual void                            leading_producer(const spl::shared_ptr<frame_producer>&) {}
-    virtual spl::shared_ptr<frame_producer> following_producer() const { return core::frame_producer::empty(); }
-    virtual boost::optional<int64_t>        auto_play_delta() const { return boost::none; }
+    virtual spl::shared_ptr<frame_producer> following_producer(bool peek) const
+    {
+        return core::frame_producer::empty();
+    }
+    virtual boost::optional<int64_t> auto_play_delta() const { return boost::none; }
 
     /**
      * Some producers take a couple of frames before they produce frames.

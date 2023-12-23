@@ -26,6 +26,7 @@
 #endif
 
 #include "AMCPCommandsImpl.h"
+#include "AMCPCommandsImplTimecode.h"
 
 #include "../util/http_request.h"
 #include "AMCPCommandQueue.h"
@@ -1673,6 +1674,8 @@ std::wstring osc_unsubscribe_command(command_context& ctx)
 
 void register_commands(std::shared_ptr<amcp_command_repository_wrapper>& repo)
 {
+    register_timecode_commands(repo);
+
     repo->register_channel_command(L"Basic Commands", L"LOADBG", loadbg_command, 1);
     repo->register_channel_command(L"Basic Commands", L"LOAD", load_command, 0);
     repo->register_channel_command(L"Basic Commands", L"PLAY", play_command, 0);

@@ -34,6 +34,7 @@
 #include <core/consumer/frame_consumer.h>
 #include <core/diagnostics/call_context.h>
 #include <core/frame/frame.h>
+#include <core/frame/frame_timecode.h>
 #include <core/mixer/audio/audio_mixer.h>
 #include <core/video_format.h>
 
@@ -190,16 +191,73 @@ core::video_format_desc get_decklink_format(const port_configuration&      confi
     return fallback_format_desc;
 }
 
+class decklink_timecode : public IDeckLinkTimecode
+{
+    std::atomic<int>     ref_count_{0};
+    core::frame_timecode timecode_;
+    BMDTimecodeFlags     flags_;
+
+  public:
+    decklink_timecode(const core::frame_timecode& timecode, const BMDTimecodeFlags flags)
+        : timecode_(timecode)
+        , flags_(flags)
+    {
+    }
+
+    // IUnknown
+
+    HRESULT STDMETHODCALLTYPE QueryInterface(REFIID, LPVOID*) override { return E_NOINTERFACE; }
+
+    ULONG STDMETHODCALLTYPE AddRef() override { return ++ref_count_; }
+
+    ULONG STDMETHODCALLTYPE Release() override
+    {
+        if (--ref_count_ == 0) {
+            delete this;
+
+            return 0;
+        }
+
+        return ref_count_;
+    }
+
+    // IDeckLinkTimecode
+
+    BMDTimecodeBCD GetBCD() override { return timecode_.bcd(); }
+
+    HRESULT
+    GetComponents(unsigned char* hours, unsigned char* minutes, unsigned char* seconds, unsigned char* frames) override
+    {
+        timecode_.get_components(*hours, *minutes, *seconds, *frames, true);
+        return S_OK;
+    }
+
+#ifdef _WIN32
+    HRESULT GetString(BSTR* timecode) override { return S_FALSE; }
+#else
+    HRESULT GetString(const char** timecode) override { return S_FALSE; }
+#endif
+
+    BMDTimecodeFlags GetFlags() override { return flags_; }
+
+    HRESULT GetTimecodeUserBits(BMDTimecodeUserBits* userBits) override { return 0; }
+};
+
 class decklink_frame : public IDeckLinkVideoFrame
 {
     core::video_format_desc format_desc_;
+    core::frame_timecode    timecode_;
     std::shared_ptr<void>   data_;
     std::atomic<int>        ref_count_{0};
     int                     nb_samples_;
 
   public:
-    decklink_frame(std::shared_ptr<void> data, core::video_format_desc format_desc, int nb_samples)
+    decklink_frame(std::shared_ptr<void>       data,
+                   core::video_format_desc     format_desc,
+                   const core::frame_timecode& timecode,
+                   int                         nb_samples)
         : format_desc_(std::move(format_desc))
+        , timecode_(timecode)
         , data_(std::move(data))
         , nb_samples_(nb_samples)
     {
@@ -238,7 +296,15 @@ class decklink_frame : public IDeckLinkVideoFrame
 
     HRESULT STDMETHODCALLTYPE GetTimecode(BMDTimecodeFormat format, IDeckLinkTimecode** timecode) override
     {
-        return S_FALSE;
+        // TODO - handle drop frame
+
+        if (format == bmdTimecodeRP188VITC2 || format == bmdTimecodeVITCField2) {
+            *timecode = new decklink_timecode(timecode_, bmdTimecodeFlagDefault | bmdTimecodeFieldMark);
+            return S_OK;
+        }
+
+        *timecode = new decklink_timecode(timecode_, bmdTimecodeFlagDefault);
+        return S_OK;
     }
 
     HRESULT STDMETHODCALLTYPE GetAncillaryData(IDeckLinkVideoFrameAncillary** ancillary) override { return S_FALSE; }
@@ -328,9 +394,11 @@ struct decklink_secondary_port final : public IDeckLinkVideoOutputCallback
     template <typename Print>
     void enable_video(const Print& print)
     {
-        if (FAILED(output_->EnableVideoOutput(mode_->GetDisplayMode(),
-                                              device_sync_group_ > 0 ? bmdVideoOutputSynchronizeToPlaybackGroup
-                                                                     : bmdVideoOutputFlagDefault)))
+        BMDVideoOutputFlags flags = bmdVideoOutputRP188 | bmdVideoOutputVITC;
+        if (device_sync_group_ > 0)
+            flags |= bmdVideoOutputSynchronizeToPlaybackGroup;
+
+        if (FAILED(output_->EnableVideoOutput(mode_->GetDisplayMode(), flags)))
             CASPAR_THROW_EXCEPTION(caspar_exception()
                                    << msg_info(print() + L" Could not enable secondary video output."));
     }
@@ -346,7 +414,7 @@ struct decklink_secondary_port final : public IDeckLinkVideoOutputCallback
         }
     }
 
-    void schedule_frame(core::const_frame frame, BMDTimeValue display_time)
+    void schedule_frame(core::frame_timecode timecode, core::const_frame frame, BMDTimeValue display_time)
     {
         bool isInterlaced = decklink_format_desc_.field_count != 1;
         if (isInterlaced && !first_field_.is_initialized()) {
@@ -369,13 +437,16 @@ struct decklink_secondary_port final : public IDeckLinkVideoOutputCallback
         auto image_data = convert_frame_for_port(
             channel_format_desc_, decklink_format_desc_, output_config_, frame1, frame2, mode_->GetFieldDominance());
 
-        schedule_next_video(image_data, 0, display_time);
+        schedule_next_video(image_data, timecode, 0, display_time);
     }
 
-    void schedule_next_video(std::shared_ptr<void> image_data, int nb_samples, BMDTimeValue display_time)
+    void schedule_next_video(std::shared_ptr<void> image_data,
+                             core::frame_timecode  timecode,
+                             int                   nb_samples,
+                             BMDTimeValue          display_time)
     {
         auto packed_frame = wrap_raw<com_ptr, IDeckLinkVideoFrame>(
-            new decklink_frame(std::move(image_data), decklink_format_desc_, nb_samples));
+            new decklink_frame(std::move(image_data), decklink_format_desc_, timecode, nb_samples));
         if (FAILED(output_->ScheduleVideoFrame(get_raw(packed_frame),
                                                display_time,
                                                decklink_format_desc_.duration,
@@ -419,10 +490,10 @@ struct decklink_consumer final : public IDeckLinkVideoOutputCallback
     const core::video_format_desc channel_format_desc_;
     const core::video_format_desc decklink_format_desc_;
 
-    std::mutex                    buffer_mutex_;
-    std::condition_variable       buffer_cond_;
-    std::queue<core::const_frame> buffer_;
-    int                           buffer_capacity_ = channel_format_desc_.field_count;
+    std::mutex                                                     buffer_mutex_;
+    std::condition_variable                                        buffer_cond_;
+    std::queue<std::pair<core::frame_timecode, core::const_frame>> buffer_;
+    int                                                            buffer_capacity_ = channel_format_desc_.field_count;
 
     const int buffer_size_ = config_.buffer_depth(); // Minimum buffer-size 3.
 
@@ -519,9 +590,9 @@ struct decklink_consumer final : public IDeckLinkVideoOutputCallback
 
             std::shared_ptr<void> image_data = create_aligned_buffer(decklink_format_desc_.size);
 
-            schedule_next_video(image_data, nb_samples, video_scheduled_);
+            schedule_next_video(image_data, core::frame_timecode::empty(), nb_samples, video_scheduled_);
             for (auto& context : secondary_port_contexts_) {
-                context->schedule_next_video(image_data, 0, video_scheduled_);
+                context->schedule_next_video(image_data, core::frame_timecode::empty(), 0, video_scheduled_);
             }
 
             video_scheduled_ += decklink_format_desc_.duration;
@@ -608,9 +679,11 @@ struct decklink_consumer final : public IDeckLinkVideoOutputCallback
 
     void enable_video()
     {
-        if (FAILED(output_->EnableVideoOutput(mode_->GetDisplayMode(),
-                                              device_sync_group_ > 0 ? bmdVideoOutputSynchronizeToPlaybackGroup
-                                                                     : bmdVideoOutputFlagDefault))) {
+        BMDVideoOutputFlags flags = bmdVideoOutputRP188 | bmdVideoOutputVITC;
+        if (device_sync_group_ > 0)
+            flags |= bmdVideoOutputSynchronizeToPlaybackGroup;
+
+        if (FAILED(output_->EnableVideoOutput(mode_->GetDisplayMode(), flags))) {
             CASPAR_THROW_EXCEPTION(caspar_exception()
                                    << msg_info(print() + L" Could not enable primary video output."));
         }
@@ -704,8 +777,8 @@ struct decklink_consumer final : public IDeckLinkVideoOutputCallback
                 }
             }
 
-            core::const_frame frame1 = pop();
-            core::const_frame frame2;
+            std::pair<core::frame_timecode, core::const_frame> frame1 = pop();
+            std::pair<core::frame_timecode, core::const_frame> frame2;
 
             bool isInterlaced = mode_->GetFieldDominance() != bmdProgressiveFrame;
             if (mode_->GetFieldDominance() != bmdProgressiveFrame) {
@@ -721,9 +794,11 @@ struct decklink_consumer final : public IDeckLinkVideoOutputCallback
 
             std::vector<std::int32_t> audio_data;
             if (config_.embedded_audio) {
-                audio_data.insert(audio_data.end(), frame1.audio_data().begin(), frame1.audio_data().end());
+                audio_data.insert(
+                    audio_data.end(), frame1.second.audio_data().begin(), frame1.second.audio_data().end());
                 if (isInterlaced) {
-                    audio_data.insert(audio_data.end(), frame2.audio_data().begin(), frame2.audio_data().end());
+                    audio_data.insert(
+                        audio_data.end(), frame2.second.audio_data().begin(), frame2.second.audio_data().end());
                 }
             }
             // TODO: is this reliable?
@@ -736,11 +811,11 @@ struct decklink_consumer final : public IDeckLinkVideoOutputCallback
                     std::shared_ptr<void> image_data = convert_frame_for_port(channel_format_desc_,
                                                                               decklink_format_desc_,
                                                                               config_.primary,
-                                                                              frame1,
-                                                                              frame2,
+                                                                              frame1.second,
+                                                                              frame2.second,
                                                                               mode_->GetFieldDominance());
 
-                    schedule_next_video(image_data, nb_samples, video_display_time);
+                    schedule_next_video(image_data, frame1.first, nb_samples, video_display_time);
 
                     if (config_.embedded_audio) {
                         schedule_next_audio(std::move(audio_data), nb_samples);
@@ -748,9 +823,9 @@ struct decklink_consumer final : public IDeckLinkVideoOutputCallback
                 } else {
                     // Send frame to secondary ports
                     auto& context = secondary_port_contexts_[i];
-                    context->schedule_frame(frame1, video_display_time);
+                    context->schedule_frame(frame1.first, frame1.second, video_display_time);
                     if (isInterlaced) {
-                        context->schedule_frame(frame2, video_display_time);
+                        context->schedule_frame(frame2.first, frame2.second, video_display_time);
                     }
 
                     if (config_.embedded_audio) {
@@ -768,9 +843,9 @@ struct decklink_consumer final : public IDeckLinkVideoOutputCallback
         return S_OK;
     }
 
-    core::const_frame pop()
+    std::pair<core::frame_timecode, core::const_frame> pop()
     {
-        core::const_frame frame;
+        std::pair<core::frame_timecode, core::const_frame> frame;
         {
             std::unique_lock<std::mutex> lock(buffer_mutex_);
             buffer_cond_.wait(lock, [&] { return !buffer_.empty() || abort_request_; });
@@ -800,17 +875,20 @@ struct decklink_consumer final : public IDeckLinkVideoOutputCallback
         audio_scheduled_ += nb_samples; // TODO - what if there are too many/few samples in this frame?
     }
 
-    void schedule_next_video(std::shared_ptr<void> image_data, int nb_samples, BMDTimeValue display_time)
+    void schedule_next_video(std::shared_ptr<void> image_data,
+                             core::frame_timecode  timecode,
+                             int                   nb_samples,
+                             BMDTimeValue          display_time)
     {
         auto fill_frame = wrap_raw<com_ptr, IDeckLinkVideoFrame>(
-            new decklink_frame(std::move(image_data), decklink_format_desc_, nb_samples));
+            new decklink_frame(std::move(image_data), decklink_format_desc_, timecode, nb_samples));
         if (FAILED(output_->ScheduleVideoFrame(
                 get_raw(fill_frame), display_time, decklink_format_desc_.duration, decklink_format_desc_.time_scale))) {
             CASPAR_LOG(error) << print() << L" Failed to schedule primary video.";
         }
     }
 
-    bool send(core::video_field field, core::const_frame frame)
+    bool send(core::video_field field, core::frame_timecode timecode, core::const_frame frame)
     {
         {
             std::lock_guard<std::mutex> lock(exception_mutex_);
@@ -825,7 +903,7 @@ struct decklink_consumer final : public IDeckLinkVideoOutputCallback
                 // Always push a field2, as we have supplied field1
                 buffer_cond_.wait(lock, [&] { return buffer_.size() < buffer_capacity_ || abort_request_; });
             }
-            buffer_.push(std::move(frame));
+            buffer_.push(std::make_pair(timecode, std::move(frame)));
         }
         buffer_cond_.notify_all();
 
@@ -880,9 +958,9 @@ struct decklink_consumer_proxy : public core::frame_consumer
         });
     }
 
-    std::future<bool> send(core::video_field field, core::const_frame frame) override
+    std::future<bool> send(core::video_field field, core::frame_timecode timecode, core::const_frame frame) override
     {
-        return executor_.begin_invoke([=] { return consumer_->send(field, frame); });
+        return executor_.begin_invoke([=] { return consumer_->send(field, timecode, frame); });
     }
 
     [[nodiscard]] std::wstring print() const override

@@ -149,7 +149,7 @@ struct artnet_consumer : public core::frame_consumer
             thread_.join();
     }
 
-    std::future<bool> send(core::video_field field, core::const_frame frame) override
+    std::future<bool> send(core::video_field field, core::frame_timecode timecode, core::const_frame frame) override
     {
         std::lock_guard<std::mutex> lock(frame_mutex_);
         last_frame_ = frame;

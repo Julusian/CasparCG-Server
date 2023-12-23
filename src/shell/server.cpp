@@ -374,6 +374,30 @@ struct server::impl
                     }
                 }
             }
+
+            // Timecode
+            const std::wstring source = xml_channel.get(L"timecode", L"free");
+            if (boost::iequals(source, "clock")) {
+                channel.raw_channel->stage()->timecode()->set_system_time(); // TODO - offset/timezone
+            } else if (boost::iequals(source, "layer")) {
+                const int layer = xml_channel.get(L"timecode_layer", 0);
+
+                // Run it on the stage to ensure the producer creation has completed fully
+                channel.raw_channel->stage()->execute([channel, layer]() {
+                    std::shared_ptr<frame_producer> producer = channel.raw_channel->stage()->foreground(layer).get();
+
+                    // Unwrap to remove the transition
+                    if (producer->following_producer(true) != frame_producer::empty())
+                        producer = producer->following_producer(true);
+
+                    if (!channel.raw_channel->stage()->timecode()->set_weak_source(producer)) {
+                        CASPAR_LOG(error) << L"timecode[" << channel.raw_channel->index()
+                                          << L"] failed to set timecode from layer " << layer;
+                    }
+                });
+            } else {
+                channel.raw_channel->stage()->timecode()->clear_source();
+            }
         }
     }
 

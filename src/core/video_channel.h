@@ -30,6 +30,7 @@
 
 #include <boost/signals2.hpp>
 
+#include <common/diagnostics/graph.h>
 #include <functional>
 
 namespace caspar { namespace core {

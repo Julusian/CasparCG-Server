@@ -80,7 +80,8 @@ struct output::impl
 
     bool remove(const spl::shared_ptr<frame_consumer>& consumer) { return remove(consumer->index()); }
 
-    void operator()(const const_frame&             input_frame1,
+    void operator()(const frame_timecode           timecode,
+                    const const_frame&             input_frame1,
                     const const_frame&             input_frame2,
                     const core::video_format_desc& format_desc)
     {
@@ -122,12 +123,12 @@ struct output::impl
             consumers = consumers_;
         }
 
-        auto do_send = [this, &consumers](core::video_field field, const core::const_frame& frame) {
+        auto do_send = [this, &timecode, &consumers](core::video_field field, const core::const_frame& frame) {
             std::map<int, std::future<bool>> futures;
 
             for (auto it = consumers.begin(); it != consumers.end();) {
                 try {
-                    futures.emplace(it->first, it->second->send(field, frame));
+                    futures.emplace(it->first, it->second->send(field, timecode, frame));
                     ++it;
                 } catch (...) {
                     CASPAR_LOG_CURRENT_EXCEPTION();
@@ -200,9 +201,12 @@ void output::add(int index, const spl::shared_ptr<frame_consumer>& consumer) { i
 void output::add(const spl::shared_ptr<frame_consumer>& consumer) { impl_->add(consumer); }
 bool output::remove(int index) { return impl_->remove(index); }
 bool output::remove(const spl::shared_ptr<frame_consumer>& consumer) { return impl_->remove(consumer); }
-void output::operator()(const const_frame& frame, const const_frame& frame2, const video_format_desc& format_desc)
+void output::operator()(const frame_timecode     timecode,
+                        const const_frame&       frame,
+                        const const_frame&       frame2,
+                        const video_format_desc& format_desc)
 {
-    return (*impl_)(frame, frame2, format_desc);
+    return (*impl_)(timecode, frame, frame2, format_desc);
 }
 core::monitor::state output::state() const { return impl_->state_; }
 }} // namespace caspar::core

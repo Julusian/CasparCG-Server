@@ -27,6 +27,7 @@
 #include <common/forward.h>
 #include <common/memory.h>
 
+#include <core/frame/frame_timecode.h>
 #include <core/video_format.h>
 
 #include <memory>
@@ -47,7 +48,10 @@ class output final
     ~output();
 
     // Send a frame to the output. If running an interlaced channel, two frames will be provided
-    void operator()(const const_frame& frame, const const_frame& frame2, const video_format_desc& format_desc);
+    void operator()(const frame_timecode     timecode,
+                    const const_frame&       frame,
+                    const const_frame&       frame2,
+                    const video_format_desc& format_desc);
 
     void add(const spl::shared_ptr<frame_consumer>& consumer);
     void add(int index, const spl::shared_ptr<frame_consumer>& consumer);

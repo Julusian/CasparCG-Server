@@ -51,9 +51,10 @@
 
 namespace caspar { namespace image {
 
-loaded_image prepare_loaded_image(FREE_IMAGE_FORMAT fif, std::shared_ptr<FIBITMAP> bitmap, bool allow_all_formats) {
+loaded_image prepare_loaded_image(FREE_IMAGE_FORMAT fif, std::shared_ptr<FIBITMAP> bitmap, bool allow_all_formats)
+{
     core::pixel_format format;
-    int stride;
+    int                stride;
 
     unsigned int bpp = FreeImage_GetBPP(bitmap.get());
     if (bpp == 32) {
@@ -80,7 +81,7 @@ loaded_image prepare_loaded_image(FREE_IMAGE_FORMAT fif, std::shared_ptr<FIBITMA
     // PNG-images need to be premultiplied with their alpha
     if (fif == FIF_PNG && format == IMAGE_BGRA_FORMAT) {
         image_view<bgra_pixel> original_view(
-                FreeImage_GetBits(bitmap.get()), FreeImage_GetWidth(bitmap.get()), FreeImage_GetHeight(bitmap.get()));
+            FreeImage_GetBits(bitmap.get()), FreeImage_GetWidth(bitmap.get()), FreeImage_GetHeight(bitmap.get()));
         premultiply(original_view);
     }
 
@@ -128,7 +129,6 @@ loaded_image load_png_from_memory(const void* memory_location, size_t size, bool
 
     return prepare_loaded_image(fif, std::move(bitmap), allow_all_formats);
 }
-
 
 const std::set<std::wstring>& supported_extensions()
 {

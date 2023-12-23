@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011 Sveriges Television AB <info@casparcg.com>
+ * Copyright (c) 2018 Norsk rikskringkasting AS
  *
  * This file is part of CasparCG (www.casparcg.com).
  *
@@ -16,29 +16,15 @@
  * You should have received a copy of the GNU General Public License
  * along with CasparCG. If not, see <http://www.gnu.org/licenses/>.
  *
- * Author: Robert Nagy, ronag89@gmail.com
+ * Author: Julian Waller, julian@superfly.tv
  */
 
 #pragma once
 
-#include <core/frame/pixel_format.h>
-#include <memory>
-#include <set>
-#include <string>
+#include "AMCPCommandsImpl.h"
 
-struct FIBITMAP;
+namespace caspar { namespace protocol { namespace amcp {
 
-namespace caspar { namespace image {
+void register_timecode_commands(std::shared_ptr<amcp_command_repository_wrapper>& repo);
 
-struct loaded_image
-{
-    std::shared_ptr<FIBITMAP> bitmap;
-    core::pixel_format        format;
-    int                       stride;
-};
-
-loaded_image                  load_image(const std::wstring& filename, bool allow_all_formats);
-loaded_image                  load_png_from_memory(const void* memory_location, size_t size, bool allow_all_formats);
-const std::set<std::wstring>& supported_extensions();
-
-}} // namespace caspar::image
+}}} // namespace caspar::protocol::amcp

@@ -85,8 +85,13 @@ const spl::shared_ptr<frame_producer>& frame_producer::empty()
             CASPAR_LOG(warning) << L" Cannot call on empty frame_producer";
             return make_ready_future(std::wstring());
         }
-        draw_frame           last_frame(const core::video_field field) override { return draw_frame{}; }
-        draw_frame           first_frame(const core::video_field field) override { return draw_frame{}; }
+        draw_frame last_frame(const core::video_field field) override { return draw_frame{}; }
+        draw_frame first_frame(const core::video_field field) override { return draw_frame{}; }
+
+        const frame_timecode& timecode() override { return frame_timecode::empty(); }
+        bool                  has_timecode() override { return false; }
+        bool                  provides_timecode() override { return false; }
+
         core::monitor::state state() const override
         {
             static const monitor::state empty;
@@ -180,10 +185,15 @@ class destroy_producer_proxy : public frame_producer
     {
         return producer_->leading_producer(producer);
     }
-    uint32_t             frame_number() const override { return producer_->frame_number(); }
-    uint32_t             nb_frames() const override { return producer_->nb_frames(); }
-    draw_frame           last_frame(const core::video_field field) override { return producer_->last_frame(field); }
-    draw_frame           first_frame(const core::video_field field) override { return producer_->first_frame(field); }
+    uint32_t   frame_number() const override { return producer_->frame_number(); }
+    uint32_t   nb_frames() const override { return producer_->nb_frames(); }
+    draw_frame last_frame(const core::video_field field) override { return producer_->last_frame(field); }
+    draw_frame first_frame(const core::video_field field) override { return producer_->first_frame(field); }
+
+    const frame_timecode& timecode() override { return producer_->timecode(); }
+    bool                  has_timecode() override { return producer_->has_timecode(); }
+    bool                  provides_timecode() override { return producer_->provides_timecode(); }
+
     core::monitor::state state() const override { return producer_->state(); }
     bool                 is_ready() override { return producer_->is_ready(); }
 };

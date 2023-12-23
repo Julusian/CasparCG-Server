@@ -343,11 +343,11 @@ class decklink_producer : public IDeckLinkInputCallback
     bool freeze_on_lost_;
     bool has_signal_;
 
-    core::draw_frame last_frame_;
+    std::pair<core::draw_frame, core::frame_timecode> last_frame_;
 
-    int                                                        buffer_capacity_ = 4;
-    std::deque<std::pair<core::draw_frame, core::video_field>> buffer_;
-    mutable std::mutex                                         buffer_mutex_;
+    int                                                                               buffer_capacity_ = 4;
+    std::deque<std::tuple<core::draw_frame, core::frame_timecode, core::video_field>> buffer_;
+    mutable std::mutex                                                                buffer_mutex_;
 
     std::exception_ptr exception_;
 
@@ -544,6 +544,8 @@ class decklink_producer : public IDeckLinkInputCallback
                 return S_OK;
             }
 
+            auto new_timecode = core::frame_timecode::empty();
+
             if (video) {
                 const auto flags = video->GetFlags();
                 has_signal_      = !(flags & bmdFrameHasNoInputSource);
@@ -580,6 +582,22 @@ class decklink_producer : public IDeckLinkInputCallback
                         FF(av_buffersrc_write_frame(audio_filter_.video_source, src.get()));
                     }
                 }
+
+                {
+                    IDeckLinkTimecode* tc;
+                    if (SUCCEEDED(video->GetTimecode(bmdTimecodeRP188Any, &tc)) && tc) {
+                        uint8_t hours, minutes, seconds, frames;
+                        if (SUCCEEDED(tc->GetComponents(&hours, &minutes, &seconds, &frames))) {
+                            const uint8_t fps = static_cast<uint8_t>(ceil(format_desc_.fps));
+                            if (core::frame_timecode::create(
+                                    hours, minutes, seconds, frames, fps, true, new_timecode)) {
+                                state_["file/timecode"] = new_timecode.string(true);
+                            }
+                        }
+
+                        tc->Release();
+                    }
+                }
             }
 
             if (audio) {
@@ -608,6 +626,11 @@ class decklink_producer : public IDeckLinkInputCallback
                         FF(av_buffersrc_write_frame(audio_filter_.audio_source, src.get()));
                     }
                 }
+            }
+
+            if (new_timecode != core::frame_timecode::empty()) {
+                // Account for latency introduced by ffmpeg filter
+                new_timecode = new_timecode - (format_desc_.field_count > 1 ? 3 : 1);
             }
 
             while (true) {
@@ -668,7 +691,7 @@ class decklink_producer : public IDeckLinkInputCallback
                 {
                     std::lock_guard<std::mutex> lock(buffer_mutex_);
 
-                    buffer_.emplace_back(std::make_pair(frame, field));
+                    buffer_.emplace_back(std::make_tuple(frame, new_timecode, field));
                     frame_count_++;
 
                     if (buffer_.size() > buffer_capacity_) {
@@ -696,14 +719,16 @@ class decklink_producer : public IDeckLinkInputCallback
             std::rethrow_exception(exception_);
         }
 
-        core::draw_frame frame;
-        bool             wrong_field = false;
+        core::draw_frame     frame;
+        core::frame_timecode timecode;
+        bool                 wrong_field = false;
         {
             std::lock_guard<std::mutex> lock(buffer_mutex_);
             if (!buffer_.empty()) {
                 auto& candidate = buffer_.front();
-                if (candidate.second == field || candidate.second == core::video_field::progressive) {
-                    frame = std::move(candidate.first);
+                if (std::get<2>(candidate) == field || std::get<2>(candidate) == core::video_field::progressive) {
+                    frame    = std::move(std::get<0>(candidate));
+                    timecode = std::get<1>(candidate);
                     buffer_.pop_front();
                 } else {
                     wrong_field = true;
@@ -717,12 +742,12 @@ class decklink_producer : public IDeckLinkInputCallback
         }
 
         if (wrong_field) {
-            return last_frame_;
+            return last_frame_.first;
         } else if (!frame && (freeze_on_lost_ || use_last_frame)) {
-            return last_frame_;
+            return last_frame_.first;
         } else {
             if (frame) {
-                last_frame_ = frame;
+                last_frame_ = std::make_pair(frame, timecode);
             }
             return frame;
         }
@@ -738,6 +763,9 @@ class decklink_producer : public IDeckLinkInputCallback
         std::lock_guard<std::mutex> lock(state_mutex_);
         return state_;
     }
+
+    const core::frame_timecode& timecode() const { return last_frame_.second; }
+    bool                        has_timecode() const { return last_frame_.second != core::frame_timecode::empty(); }
 };
 
 class decklink_producer_proxy : public core::frame_producer
@@ -797,6 +825,10 @@ class decklink_producer_proxy : public core::frame_producer
     std::wstring print() const override { return producer_->print(); }
 
     std::wstring name() const override { return L"decklink"; }
+
+    const core::frame_timecode& timecode() override { return producer_->timecode(); }
+    bool                        has_timecode() override { return producer_->has_timecode(); }
+    bool                        provides_timecode() override { return true; }
 };
 
 spl::shared_ptr<core::frame_producer> create_producer(const core::frame_producer_dependencies& dependencies,

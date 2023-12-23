@@ -10,6 +10,7 @@ set(SOURCES
 
 		frame/draw_frame.cpp
 		frame/frame.cpp
+		frame/frame_timecode.cpp
 		frame/frame_transform.cpp
 		frame/geometry.cpp
 
@@ -30,6 +31,7 @@ set(SOURCES
 
 		video_channel.cpp
 		video_format.cpp
+		channel_timecode.cpp
 )
 set(HEADERS
 		consumer/frame_consumer.h
@@ -40,6 +42,7 @@ set(HEADERS
 
 		frame/draw_frame.h
 		frame/frame.h
+		frame/frame_timecode.h
 		frame/frame_factory.h
 		frame/frame_transform.h
 		frame/frame_visitor.h
@@ -63,6 +66,7 @@ set(HEADERS
 
 		producer/cg_proxy.h
 		producer/frame_producer.h
+		producer/timecode_source.h
 		producer/layer.h
 		producer/stage.h
 
@@ -71,6 +75,7 @@ set(HEADERS
 		StdAfx.h
 		video_channel.h
 		video_format.h
+		channel_timecode.h
 )
 
 casparcg_add_library(core SOURCES ${SOURCES} ${HEADERS})

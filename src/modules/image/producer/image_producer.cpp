@@ -89,8 +89,9 @@ struct image_producer : public core::frame_producer
     void load(const loaded_image& image)
     {
         core::pixel_format_desc desc(image.format);
-        desc.planes.emplace_back(FreeImage_GetWidth(image.bitmap.get()), FreeImage_GetHeight(image.bitmap.get()), image.stride);
-        auto frame = frame_factory_->create_frame(this, desc);
+        desc.planes.emplace_back(
+            FreeImage_GetWidth(image.bitmap.get()), FreeImage_GetHeight(image.bitmap.get()), image.stride);
+        auto frame       = frame_factory_->create_frame(this, desc);
         frame.geometry() = core::frame_geometry::get_default_vflip();
 
         std::copy_n(FreeImage_GetBits(image.bitmap.get()), frame.image_data(0).size(), frame.image_data(0).begin());

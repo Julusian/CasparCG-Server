@@ -29,7 +29,9 @@
 #include <common/memory.h>
 #include <common/tweener.h>
 
+#include <core/channel_timecode.h>
 #include <core/frame/draw_frame.h>
+#include <core/frame/frame_timecode.h>
 #include <core/video_format.h>
 
 #include <functional>
@@ -56,6 +58,8 @@ struct layer_frame
 struct stage_frames
 {
     core::video_format_desc format_desc;
+    core::frame_timecode    timecode;
+    std::wstring            timecode_source;
     int                     nb_samples;
     std::vector<draw_frame> frames;
     std::vector<draw_frame> frames2;
@@ -153,6 +157,8 @@ class stage final : public stage_base
 
     core::video_format_desc video_format_desc() const;
     std::future<void>       video_format_desc(const core::video_format_desc& format_desc);
+
+    std::shared_ptr<core::channel_timecode> timecode() const;
 
   private:
     struct impl;

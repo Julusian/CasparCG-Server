@@ -582,7 +582,7 @@ struct screen_consumer_proxy : public core::frame_consumer
         consumer_ = std::make_unique<screen_consumer>(config_, format_desc, channel_index);
     }
 
-    std::future<bool> send(core::video_field field, core::const_frame frame) override
+    std::future<bool> send(core::video_field field, core::frame_timecode timecode, core::const_frame frame) override
     {
         return consumer_->send(field, frame);
     }
