@@ -30,7 +30,7 @@ body:
     attributes:
       label: Steps to reproduce
       description: How can we reproduce the issue?
-      default: |
+      value: |
         1.
         2.
         3. ...
@@ -41,7 +41,7 @@ body:
     attributes:
       label: Environment
       description: What version of CasparCG and OS are you using?
-      default: |
+      value: |
         * Commit: [e.g. ab1234c]
         * Server version: [e.g. v2.2]
         * Operating system: [e.g. Windows 10]
