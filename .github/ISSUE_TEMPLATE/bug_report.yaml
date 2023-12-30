@@ -30,18 +30,18 @@ body:
     attributes:
       label: Steps to reproduce
       description: How can we reproduce the issue?
-      placeholder: |
+      default: |
         1.
         2.
         3. ...
     validations:
       required: true
 
-  - type: input
+  - type: textarea
     attributes:
       label: Environment
       description: What version of CasparCG and OS are you using?
-      placeholder: |
+      default: |
         * Commit: [e.g. ab1234c]
         * Server version: [e.g. v2.2]
         * Operating system: [e.g. Windows 10]
