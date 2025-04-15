@@ -375,7 +375,21 @@ struct image_mixer::impl
         description.width = desc.planes[0].width;
         description.height = desc.planes[0].height;
 
+        description.source_format = 0;
+
         // TODO - more properties?
+
+        // description.plane0_offset = 0;
+
+        // if (desc.planes.size() > 1) {
+        //     description.plane1_offset = description.plane0_offset + desc.planes[0].size;
+        // }
+        // if (desc.planes.size() > 2) {
+        //     description.plane2_offset = description.plane1_offset + desc.planes[1].size;
+        // }
+        // if (desc.planes.size() > 3) {
+        //     description.plane3_offset = description.plane2_offset + desc.planes[2].size;
+        // }
 
         // TODO - different when going to 16bit?
         unsigned int x_count = (description.width + 31) / 32;

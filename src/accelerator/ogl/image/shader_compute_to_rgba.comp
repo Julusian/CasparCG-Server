@@ -39,11 +39,30 @@ layout(std430, binding = 3) buffer description_layout
     uint frame_height;
 //    uint words_per_line;
 //    uint key_only;
-//    uint straighten;
+    uint premultiply;
+
+    uint source_format;
+
+    uint plane0_offset;
+
+    uint plane1_offset;
+
+    uint plane2_offset;
+
+    uint plane3_offset;
 };
 
+vec4 premultiply_pixel(vec4 pixel) {
+    return vec4(
+    pixel.r * pixel.a,
+    pixel.g * pixel.a,
+    pixel.b * pixel.a,
+    pixel.a
+    );
+}
+
 void write_pixel(ivec2 coord, vec4 color) {
-//    if (straighten > 0) return straighten_pixel(pixel);
+    if (premultiply > 0) color = premultiply_pixel(color);
 
     if (is_16_bit > 0) {
         imageStore(imgOutput16bit, coord, color);
@@ -55,6 +74,8 @@ void write_pixel(ivec2 coord, vec4 color) {
 void main() {
     vec4 value = vec4(0.0, 0.0, 0.0, 1.0);
     ivec2 texelCoord = ivec2(gl_GlobalInvocationID.xy);
+
+
 
     value.r = ((bufferInput[gl_GlobalInvocationID.x] >> 24) & 0xff) / 255.0;
     value.g = ((bufferInput[gl_GlobalInvocationID.x] >> 16) & 0xff) / 255.0;
