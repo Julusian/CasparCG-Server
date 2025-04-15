@@ -248,27 +248,6 @@ struct device::impl : public std::enable_shared_from_this<impl>
         });
     }
 
-    /*
-    * In its current form, this is not useful/complete. But it will be needed in some form for a producer 'soon'
-   std::future<std::shared_ptr<texture>>
-   std::future<std::shared_ptr<texture>>
-   copy_async(GLuint source, int width, int height, int stride, common::bit_depth depth)
-   convert_frame(const std::vector<array<const uint8_t>>& sources, int width, int height, int width_samples)
-    {
-        return dispatch_async([=] {
-            if (!compute_to_rgba_)
-                compute_to_rgba_ = std::make_unique<compute_shader>(std::string(compute_to_rgba_shader));
-            auto tex = create_texture(width, height, 4, common::bit_depth::bit16, false);
-            glBindImageTexture(0, tex->id(), 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA16F);
-            compute_to_rgba_->use();
-            glDispatchCompute((unsigned int)width_samples, (unsigned int)height, 1);
-            // make sure writing to image has finished before read
-            glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-            return tex;
-        });
-    }
-    */
-
     std::future<array<const uint8_t>> convert_from_texture(const std::shared_ptr<texture>&         texture,
                                                            int                                     buffer_size,
                                                            const convert_from_texture_description& description,
@@ -324,6 +303,61 @@ struct device::impl : public std::enable_shared_from_this<impl>
 
             auto ptr = reinterpret_cast<uint8_t*>(buffer_ptr->data());
             return array<const uint8_t>(ptr, buffer_ptr->size(), std::move(buffer_ptr));
+        });
+    }
+
+    std::future<std::shared_ptr<texture>> convert_to_texture(const std::shared_ptr<buffer>&         buffer,
+                                                               const convert_to_texture_description& description,
+                                                               unsigned int                            x_count,
+                                                               unsigned int                            y_count)
+    {
+        return spawn_async([=](yield_context yield) {
+            if (!compute_to_rgba_)
+                compute_to_rgba_ = std::make_unique<compute_shader>(shaders_source::compute_to_rgba);
+
+            auto bit_depth_val = description.to_16_bit ? common::bit_depth::bit16 : common::bit_depth::bit8;
+            auto texture = create_texture(description.width, description.height, 4, bit_depth_val, false);
+
+            // single input texture
+            GLuint texid_8bit  = 0;
+            GLuint texid_16bit = 0;
+
+            if (description.to_16_bit) {
+                texid_16bit = texture->id();
+            } else {
+                texid_8bit = texture->id();
+            }
+
+            GL(glBindImageTexture(0, texid_16bit, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA16));
+            GL(glBindImageTexture(1, texid_8bit, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA8));
+
+            GL(glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, buffer->id()));
+
+            auto description_buffer = create_buffer(sizeof(convert_to_texture_description), false);
+            std::memcpy(description_buffer->data(), &description, sizeof(convert_to_texture_description));
+            GL(glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, description_buffer->id()));
+
+            compute_to_rgba_->use();
+
+            GL(glDispatchCompute(x_count, y_count, 1));
+
+            auto fence = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+
+            GL(glFlush());
+            deadline_timer timer(service_);
+            for (auto n = 0; true; ++n) {
+                // TODO (perf) Smarter non-polling solution?
+                timer.expires_from_now(boost::posix_time::milliseconds(2));
+                timer.async_wait(yield);
+                auto wait = glClientWaitSync(fence, 0, 1);
+                if (wait == GL_ALREADY_SIGNALED || wait == GL_CONDITION_SATISFIED) {
+                    break;
+                }
+            }
+
+            glDeleteSync(fence);
+
+            return std::move(texture);
         });
     }
 
@@ -446,11 +480,7 @@ std::shared_ptr<texture> device::create_texture(int width, int height, int strid
     return impl_->create_texture(width, height, stride, depth, true);
 }
 std::shared_ptr<class buffer> device::create_buffer(int size, bool write) { return impl_->create_buffer(size, write); }
-std::future<std::shared_ptr<texture>>
-device::copy_async(const array<const uint8_t>& source, int width, int height, int stride, common::bit_depth depth)
-{
-    return impl_->copy_async(source, width, height, stride, depth);
-}
+
 std::future<array<const uint8_t>> device::convert_from_texture(const std::shared_ptr<texture>&         texture,
                                                                int                                     buffer_size,
                                                                const convert_from_texture_description& description,
@@ -459,6 +489,14 @@ std::future<array<const uint8_t>> device::convert_from_texture(const std::shared
 {
     return impl_->convert_from_texture(texture, buffer_size, description, x_count, y_count);
 }
+std::future<std::shared_ptr<texture>> device::convert_to_texture(const std::shared_ptr<buffer>&         buffer,
+                                                       const convert_to_texture_description& description,
+                                                       unsigned int                            x_count,
+                                                       unsigned int                            y_count)
+{
+    return impl_->convert_to_texture(buffer, description, x_count, y_count);
+}
+
 void         device::dispatch(std::function<void()> func) { boost::asio::dispatch(impl_->service_, std::move(func)); }
 std::wstring device::version() const { return impl_->version(); }
 boost::property_tree::wptree device::info() const { return impl_->info(); }

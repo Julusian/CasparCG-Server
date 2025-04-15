@@ -20,16 +20,48 @@
  */
 #version 430
 
-layout (local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
 
-layout(rgba16f, binding = 0) uniform image2D imgOutput; // Note: this needs to match what it is writing to
+layout (local_size_x = 32, local_size_y = 32, local_size_z = 1) in;
+
+layout(rgba16, binding = 0) uniform image2D imgOutput16bit; // Note: this needs to match what it is writing to
+layout(rgba8, binding = 1) uniform image2D imgOutput8bit; // Note: this needs to match what it is writing to
+
+layout(std430, binding = 2) readonly buffer buffer_layout
+{
+    uint bufferInput[];
+};
+
+layout(std430, binding = 3) buffer description_layout
+{
+    // This must match convert_from_texture_description in device.h
+    uint is_16_bit;
+    uint frame_width;
+    uint frame_height;
+//    uint words_per_line;
+//    uint key_only;
+//    uint straighten;
+};
+
+void write_pixel(ivec2 coord, vec4 color) {
+//    if (straighten > 0) return straighten_pixel(pixel);
+
+    if (is_16_bit > 0) {
+        imageStore(imgOutput16bit, coord, color);
+    } else {
+        imageStore(imgOutput8bit, coord, color);
+    }
+}
 
 void main() {
     vec4 value = vec4(0.0, 0.0, 0.0, 1.0);
     ivec2 texelCoord = ivec2(gl_GlobalInvocationID.xy);
 
-    value.r = float(texelCoord.x)/(gl_NumWorkGroups.x);
-    value.g = float(texelCoord.y)/(gl_NumWorkGroups.y);
+    value.r = ((bufferInput[gl_GlobalInvocationID.x] >> 24) & 0xff) / 255.0;
+    value.g = ((bufferInput[gl_GlobalInvocationID.x] >> 16) & 0xff) / 255.0;
+    value.b = ((bufferInput[gl_GlobalInvocationID.x] >> 8) & 0xff) / 255.0;
 
-    imageStore(imgOutput, texelCoord, value);
+//    value.r = float(texelCoord.x)/(gl_NumWorkGroups.x);
+//    value.g = float(texelCoord.y)/(gl_NumWorkGroups.y);
+
+    write_pixel(texelCoord, value);
 }

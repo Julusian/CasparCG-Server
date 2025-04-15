@@ -17,7 +17,7 @@ class mutable_frame final
     friend class const_frame;
 
   public:
-    using commit_t = std::function<std::any(std::vector<array<const std::uint8_t>>)>;
+    using commit_t = std::function<std::any()>;
 
     explicit mutable_frame(std::vector<array<std::uint8_t>> image_data,
                            array<std::int32_t>              audio_data,

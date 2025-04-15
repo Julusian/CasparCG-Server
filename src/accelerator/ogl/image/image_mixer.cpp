@@ -298,10 +298,10 @@ struct image_mixer::impl
         item.geometry   = frame.geometry();
 
         // TODO - this shouldn't be a vector anymore...
-        auto textures_ptr = std::any_cast<std::shared_ptr<std::vector<future_texture>>>(frame.image_ptr());
+        auto textures_ptr = std::any_cast<future_texture>(frame.image_ptr());
 
-        if (textures_ptr) {
-            item.texture = textures_ptr->at(0);
+        if (textures_ptr.valid()) {
+            item.texture = textures_ptr;
         } else {
             CASPAR_LOG(debug) << "Skipping drawing frame which has no textures";
         }
@@ -328,6 +328,11 @@ struct image_mixer::impl
     core::mutable_frame
     create_frame(const core::pixel_format_desc& desc, common::bit_depth depth) override
     {
+        if (desc.planes.empty() || desc.planes.size() > 4) {
+            CASPAR_THROW_EXCEPTION(caspar_exception()
+                                       << msg_info(L"Frame must have at least one plane, but not more than 4."));
+        }
+
         int total_size = 0;
         for (auto& plane : desc.planes) {
             total_size += plane.size;
@@ -347,24 +352,36 @@ struct image_mixer::impl
         return core::mutable_frame(std::move(image_data),
                                    array<int32_t>{},
                                    desc,
-                                   [weak_self, desc, ogl_buffer = std::move(ogl_buffer)](std::vector<array<const std::uint8_t>> image_data) -> std::any {
+                                   [weak_self, desc, ogl_buffer = std::move(ogl_buffer)]() -> std::any {
                                        auto self = weak_self.lock();
                                        if (!self) {
                                            return std::any{};
                                        }
-                                       std::vector<future_texture> textures;
-                                       for (int n = 0; n < static_cast<int>(desc.planes.size()); ++n) {
-                                           textures.emplace_back(self->ogl_->copy_async(image_data[n],
-                                                                                        desc.planes[n].width,
-                                                                                        desc.planes[n].height,
-                                                                                        desc.planes[n].stride,
-                                                                                        desc.planes[n].depth));
-                                       }
 
-                                       // TODO - ditch all this and use combined_buffer instead!
-
-                                       return std::make_shared<decltype(textures)>(std::move(textures));
+                                       return self->convert_buffer_to_texture(ogl_buffer, desc);
                                    });
+    }
+
+    future_texture convert_buffer_to_texture(const std::shared_ptr<buffer> &ogl_buffer, const core::pixel_format_desc& desc)
+    {
+        bool to_16bit = false;
+        for (auto& plane : desc.planes) {
+            // TODO - should this be avoided if the channel is 8bit?
+            if (common::bytes_per_pixel(plane.depth) > 1) to_16bit = true;
+        }
+
+        convert_to_texture_description description;
+        description.to_16_bit = to_16bit;
+        description.width = desc.planes[0].width;
+        description.height = desc.planes[0].height;
+
+        // TODO - more properties?
+
+        // TODO - different when going to 16bit?
+        unsigned int x_count = (description.width + 31) / 32;
+        unsigned int y_count = (description.height + 31) / 32;
+
+        return ogl_->convert_to_texture(ogl_buffer, description, x_count, y_count);
     }
 
     spl::shared_ptr<core::frame_converter> create_frame_converter()

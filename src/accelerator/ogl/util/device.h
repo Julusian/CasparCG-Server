@@ -51,13 +51,15 @@ class device final
     std::shared_ptr<class texture> create_texture(int width, int height, int stride, common::bit_depth depth);
     std::shared_ptr<class buffer> create_buffer(int size, bool write);
 
-    std::future<std::shared_ptr<class texture>>
-    copy_async(const array<const uint8_t>& source, int width, int height, int stride, common::bit_depth depth);
-
     std::future<array<const uint8_t>> convert_from_texture(const std::shared_ptr<texture>&         texture,
                                                            int                                     buffer_size,
                                                            const convert_from_texture_description& description,
                                                            unsigned int                            x_count,
+                                                           unsigned int                            y_count);
+
+    std::future<std::shared_ptr<texture>> convert_to_texture(const std::shared_ptr<buffer>&         buffer,
+                                                           const convert_to_texture_description& description,
+                                                             unsigned int                            x_count,
                                                            unsigned int                            y_count);
 
     template <typename Func>

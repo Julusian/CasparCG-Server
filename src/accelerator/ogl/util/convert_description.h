@@ -45,4 +45,19 @@ struct convert_from_texture_description
     uint32_t region_h;
 };
 
+
+// This must match description_layout in shader_to_rgba.comp
+struct convert_to_texture_description
+{
+  uint32_t to_16_bit;
+  uint32_t width;
+  uint32_t height;
+  // uint32_t words_per_line;
+  // uint32_t key_only;
+  // uint32_t straighten;
+
+
+
+};
+
 } // namespace caspar::accelerator::ogl

@@ -111,8 +111,7 @@ struct const_frame::impl
             CASPAR_THROW_EXCEPTION(invalid_argument());
         }
 
-        image_ptr_ = other.impl_->commit_({std::make_move_iterator(other.impl_->image_data_.begin()),
-                      std::make_move_iterator(other.impl_->image_data_.end())});
+        image_ptr_ = other.impl_->commit_();
     }
 
     std::size_t     width() const { return width_; }
