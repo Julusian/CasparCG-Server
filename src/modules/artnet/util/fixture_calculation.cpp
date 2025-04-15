@@ -86,11 +86,8 @@ rect compute_rect(box fixtureBox, int index, int count)
     return rectangle;
 }
 
-color average_color(const core::pixel_format_desc::plane& pix_desc, const array<const uint8_t>& pixels, rect& rectangle)
+color average_color(int width, int height, const array<const uint8_t>& pixels, rect& rectangle)
 {
-    int width  = pix_desc.width;
-    int height = pix_desc.height;
-
     float x_values[] = {rectangle.p1.x, rectangle.p2.x, rectangle.p3.x, rectangle.p4.x};
     float y_values[] = {rectangle.p1.y, rectangle.p2.y, rectangle.p3.y, rectangle.p4.y};
 

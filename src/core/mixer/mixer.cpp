@@ -75,23 +75,14 @@ struct mixer::impl
 
         state_["audio"] = audio_mixer_.state();
 
-        auto depth       = image_mixer_->depth();
-        auto color_space = image_mixer_->color_space();
-
         buffer_.push(std::async(std::launch::deferred,
                                 [image = std::move(image),
                                  audio = std::move(audio),
                                  graph = graph_,
-                                 depth,
-                                 color_space,
                                  format_desc]() mutable {
-                                    auto desc = pixel_format_desc(pixel_format::bgra, color_space);
-                                    desc.planes.push_back(
-                                        pixel_format_desc::plane(format_desc.width, format_desc.height, 4, depth));
-
                                     auto image_ptr = image.get();
 
-                                    return const_frame(std::move(image_ptr), std::move(audio), desc);
+                                    return const_frame(std::move(image_ptr), std::move(audio), format_desc.width, format_desc.height);
                                 }));
 
         if (buffer_.size() <= format_desc.field_count) {

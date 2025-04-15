@@ -57,15 +57,14 @@ class const_frame final
     const_frame();
     explicit const_frame(std::any image_ptr,
                          array<const std::int32_t>              audio_data,
-                         const struct pixel_format_desc&        desc);
+         int width,
+         int height);
     const_frame(const const_frame& other);
     const_frame(mutable_frame&& other);
 
     ~const_frame();
 
     const_frame& operator=(const const_frame& other);
-
-    const struct pixel_format_desc& pixel_format_desc() const;
 
     const std::any& image_ptr() const;
 

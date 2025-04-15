@@ -956,7 +956,8 @@ struct decklink_consumer final : public IDeckLinkVideoOutputCallback
                     schedule_next_video(image_data,
                                         nb_samples,
                                         video_display_time,
-                                        frame1.value().frame.pixel_format_desc().color_space);
+                                        config_.hdr_meta.default_color_space // TODO - fix this
+                                        );
 
                     if (config_.embedded_audio) {
                         schedule_next_audio(std::move(audio_data), nb_samples);

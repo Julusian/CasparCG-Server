@@ -86,27 +86,28 @@ struct const_frame::impl
 {
     std::any image_ptr_;
     array<const std::int32_t>              audio_data_;
-    core::pixel_format_desc                desc_     = core::pixel_format_desc(pixel_format::invalid);
     frame_geometry                         geometry_ = frame_geometry::get_default();
+    int width_;
+    int height_;
 
     impl(std::any image_ptr,
          array<const std::int32_t>              audio_data,
-         const core::pixel_format_desc&         desc)
+         int width,
+         int height)
         : image_ptr_(std::move(image_ptr))
         , audio_data_(std::move(audio_data))
-        , desc_(desc)
+    ,width_(width)
+    ,height_(height)
     {
-        if (desc_.planes.size() != 1) {
-            CASPAR_THROW_EXCEPTION(invalid_argument());
-        }
     }
 
     impl(mutable_frame&& other)
         : audio_data_(std::move(other.impl_->audio_data_))
-        , desc_(std::move(other.impl_->desc_))
         , geometry_(std::move(other.impl_->geometry_))
+    ,width_(other.width())
+    ,height_(other.height())
     {
-        if (desc_.planes.size() != other.impl_->image_data_.size() && !other.impl_->commit_) {
+        if (!other.impl_->commit_) {
             CASPAR_THROW_EXCEPTION(invalid_argument());
         }
 
@@ -114,16 +115,17 @@ struct const_frame::impl
                       std::make_move_iterator(other.impl_->image_data_.end())});
     }
 
-    std::size_t     width() const { return desc_.planes.at(0).width; }
+    std::size_t     width() const { return width_; }
 
-    std::size_t height() const { return desc_.planes.at(0).height; }
+    std::size_t height() const { return height_; }
 };
 
 const_frame::const_frame() {}
 const_frame::const_frame(std::any image_ptr,
                          array<const std::int32_t>              audio_data,
-                         const core::pixel_format_desc&         desc)
-    : impl_(new impl(std::move(image_ptr), std::move(audio_data), desc))
+         int width,
+         int height)
+    : impl_(new impl(std::move(image_ptr), std::move(audio_data), width, height))
 {
 }
 const_frame::const_frame(mutable_frame&& other)
@@ -144,11 +146,10 @@ bool                     const_frame::operator==(const const_frame& other) const
 bool                     const_frame::operator!=(const const_frame& other) const { return !(*this == other); }
 bool                     const_frame::operator<(const const_frame& other) const { return impl_ < other.impl_; }
 bool                     const_frame::operator>(const const_frame& other) const { return impl_ > other.impl_; }
-const pixel_format_desc& const_frame::pixel_format_desc() const { return impl_->desc_; }
 const std::any& const_frame::image_ptr() const { return impl_->image_ptr_; }
 const array<const std::int32_t>& const_frame::audio_data() const { return impl_->audio_data_; }
 std::size_t                      const_frame::width() const { return impl_->width(); }
 std::size_t                      const_frame::height() const { return impl_->height(); }
 const frame_geometry&            const_frame::geometry() const { return impl_->geometry_; }
-const_frame::operator bool() const { return impl_ != nullptr && impl_->desc_.format != core::pixel_format::invalid; }
+const_frame::operator bool() const { return impl_ != nullptr && impl_->width_ != 0 && impl_->height_ != 0; }
 }} // namespace caspar::core

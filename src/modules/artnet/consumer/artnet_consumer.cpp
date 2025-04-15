@@ -119,7 +119,7 @@ struct artnet_consumer : public core::frame_consumer
                     memset(dmx_data, 0, 512);
 
                     for (auto computed_fixture : computed_fixtures) {
-                        auto     color = average_color(frame.pixel_format_desc().planes[0], last_fetched_pixels, computed_fixture.rectangle);
+                        auto     color = average_color(frame.width(), frame.height(), last_fetched_pixels, computed_fixture.rectangle);
                         uint8_t* ptr   = dmx_data + computed_fixture.address;
 
                         switch (computed_fixture.type) {

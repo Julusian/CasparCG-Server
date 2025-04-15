@@ -88,6 +88,6 @@ struct fixture
 };
 
 rect  compute_rect(box fixtureBox, int index, int count);
-color average_color(const core::pixel_format_desc::plane& pix_desc, const array<const uint8_t>& pixels, rect& rectangle);
+color average_color(int width, int height, const array<const uint8_t>& pixels, rect& rectangle);
 
 }} // namespace caspar::artnet

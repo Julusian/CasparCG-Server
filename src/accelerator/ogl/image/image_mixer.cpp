@@ -49,7 +49,6 @@ using future_texture = std::shared_future<std::shared_ptr<texture>>;
 
 struct item
 {
-    core::pixel_format_desc     pix_desc = core::pixel_format_desc(core::pixel_format::invalid);
     std::vector<future_texture> textures;
     draw_transforms             transforms;
     core::frame_geometry        geometry = core::frame_geometry::get_default();
@@ -184,7 +183,6 @@ class image_renderer
         draw_params.target_height = format_desc.square_height;
         // TODO: Pass the target color_space
 
-        draw_params.pix_desc   = std::move(item.pix_desc);
         draw_params.transforms = std::move(item.transforms);
         draw_params.geometry   = std::move(item.geometry);
         draw_params.aspect_ratio =
@@ -302,14 +300,7 @@ struct image_mixer::impl
 
     void visit(const core::const_frame& frame)
     {
-        if (frame.pixel_format_desc().format == core::pixel_format::invalid)
-            return;
-
-        if (frame.pixel_format_desc().planes.empty())
-            return;
-
         item item;
-        item.pix_desc   = frame.pixel_format_desc();
         item.transforms = transform_stack_.back();
         item.geometry   = frame.geometry();
 
