@@ -281,7 +281,7 @@ class html_client
         core::pixel_format_desc pixel_desc(core::pixel_format::bgra);
         pixel_desc.planes.emplace_back(width, height, 4);
 
-        core::mutable_frame frame = frame_factory_->create_frame(this, pixel_desc);
+        core::mutable_frame frame = frame_factory_->create_frame(pixel_desc);
         char*               src   = (char*)buffer;
         char*               dst   = reinterpret_cast<char*>(frame.image_data(0).begin());
         test_timer_.restart();

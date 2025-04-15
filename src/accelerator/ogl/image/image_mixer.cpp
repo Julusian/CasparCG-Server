@@ -335,13 +335,13 @@ struct image_mixer::impl
         return renderer_.render(std::move(layers_), format_desc);
     }
 
-    core::mutable_frame create_frame(const void* tag, const core::pixel_format_desc& desc) override
+    core::mutable_frame create_frame(const core::pixel_format_desc& desc) override
     {
-        return create_frame(tag, desc, common::bit_depth::bit8);
+        return create_frame(desc, common::bit_depth::bit8);
     }
 
     core::mutable_frame
-    create_frame(const void* tag, const core::pixel_format_desc& desc, common::bit_depth depth) override
+    create_frame(const core::pixel_format_desc& desc, common::bit_depth depth) override
     {
         std::vector<array<std::uint8_t>> image_data;
         for (auto& plane : desc.planes) {
@@ -349,8 +349,7 @@ struct image_mixer::impl
         }
 
         std::weak_ptr<image_mixer::impl> weak_self = shared_from_this();
-        return core::mutable_frame(tag,
-                                   std::move(image_data),
+        return core::mutable_frame(std::move(image_data),
                                    array<int32_t>{},
                                    desc,
                                    [weak_self, desc](std::vector<array<const std::uint8_t>> image_data) -> std::any {
@@ -396,14 +395,14 @@ std::future<std::any> image_mixer::render(const core::video_format_desc& format_
     auto texture = impl_->render(format_desc);
     return std::async([texture = std::move(texture)]() -> std::any { return std::any(texture.get()); });
 }
-core::mutable_frame image_mixer::create_frame(const void* tag, const core::pixel_format_desc& desc)
+core::mutable_frame image_mixer::create_frame(const core::pixel_format_desc& desc)
 {
-    return impl_->create_frame(tag, desc);
+    return impl_->create_frame(desc);
 }
 core::mutable_frame
-image_mixer::create_frame(const void* tag, const core::pixel_format_desc& desc, common::bit_depth depth)
+image_mixer::create_frame(const core::pixel_format_desc& desc, common::bit_depth depth)
 {
-    return impl_->create_frame(tag, desc, depth);
+    return impl_->create_frame(desc, depth);
 }
 spl::shared_ptr<core::frame_converter> image_mixer::create_frame_converter() { return impl_->create_frame_converter(); }
 

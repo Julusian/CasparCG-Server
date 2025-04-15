@@ -43,8 +43,7 @@ std::shared_ptr<AVPacket> alloc_packet()
     return packet;
 }
 
-core::mutable_frame make_frame(void*                            tag,
-                               core::frame_factory&             frame_factory,
+core::mutable_frame make_frame(core::frame_factory&             frame_factory,
                                std::shared_ptr<AVFrame>         video,
                                std::shared_ptr<AVFrame>         audio,
                                core::color_space                color_space,
@@ -59,7 +58,7 @@ core::mutable_frame make_frame(void*                            tag,
               : core::pixel_format_desc(core::pixel_format::invalid);
     pix_desc.is_straight_alpha = is_straight_alpha;
 
-    auto frame = frame_factory.create_frame(tag, pix_desc);
+    auto frame = frame_factory.create_frame(pix_desc);
     if (scale_mode != core::frame_geometry::scale_mode::stretch) {
         frame.geometry() = core::frame_geometry::get_default(scale_mode);
     }

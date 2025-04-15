@@ -84,8 +84,7 @@ struct mixer::impl
                                  graph = graph_,
                                  depth,
                                  color_space,
-                                 format_desc,
-                                 tag = this]() mutable {
+                                 format_desc]() mutable {
                                     auto desc = pixel_format_desc(pixel_format::bgra, color_space);
                                     desc.planes.push_back(
                                         pixel_format_desc::plane(format_desc.width, format_desc.height, 4, depth));
@@ -119,9 +118,9 @@ const_frame mixer::operator()(std::vector<draw_frame> frames, const video_format
 {
     return (*impl_)(std::move(frames), format_desc, nb_samples);
 }
-mutable_frame mixer::create_frame(const void* tag, const pixel_format_desc& desc)
+mutable_frame mixer::create_frame(const pixel_format_desc& desc)
 {
-    return impl_->image_mixer_->create_frame(tag, desc);
+    return impl_->image_mixer_->create_frame(desc);
 }
 core::monitor::state mixer::state() const { return impl_->state_; }
 

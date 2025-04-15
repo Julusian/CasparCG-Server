@@ -197,7 +197,7 @@ struct image_scroll_producer : public core::frame_producer
             while (count > 0) {
                 core::pixel_format_desc desc = core::pixel_format_desc(core::pixel_format::bgra);
                 desc.planes.emplace_back(width_, format_desc_.height, 4);
-                auto frame = frame_factory->create_frame(this, desc);
+                auto frame = frame_factory->create_frame(desc);
 
                 if (count >= frame.image_data(0).size()) {
                     std::copy_n(bytes + count - frame.image_data(0).size(),
@@ -222,7 +222,7 @@ struct image_scroll_producer : public core::frame_producer
             while (count > 0) {
                 core::pixel_format_desc desc = core::pixel_format_desc(core::pixel_format::bgra);
                 desc.planes.emplace_back(format_desc_.width, height_, 4);
-                auto frame = frame_factory->create_frame(this, desc);
+                auto frame = frame_factory->create_frame(desc);
                 if (count >= frame.image_data(0).size()) {
                     for (int y = 0; y < height_; ++y)
                         std::copy_n(bytes + i * format_desc_.width * 4 + y * width_ * 4,

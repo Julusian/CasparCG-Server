@@ -19,8 +19,7 @@ class mutable_frame final
   public:
     using commit_t = std::function<std::any(std::vector<array<const std::uint8_t>>)>;
 
-    explicit mutable_frame(const void*                      tag,
-                           std::vector<array<std::uint8_t>> image_data,
+    explicit mutable_frame(std::vector<array<std::uint8_t>> image_data,
                            array<std::int32_t>              audio_data,
                            const struct pixel_format_desc&  desc,
                            commit_t                         commit = nullptr);

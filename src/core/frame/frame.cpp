@@ -37,33 +37,29 @@ struct mutable_frame::impl
     std::vector<array<std::uint8_t>> image_data_;
     array<std::int32_t>              audio_data_;
     const core::pixel_format_desc    desc_;
-    const void*                      tag_;
     frame_geometry                   geometry_ = frame_geometry::get_default();
     mutable_frame::commit_t          commit_;
 
     impl(const impl&)            = delete;
     impl& operator=(const impl&) = delete;
 
-    impl(const void*                      tag,
-         std::vector<array<std::uint8_t>> image_data,
+    impl(std::vector<array<std::uint8_t>> image_data,
          array<std::int32_t>              audio_data,
          const core::pixel_format_desc&   desc,
          commit_t                         commit)
         : image_data_(std::move(image_data))
         , audio_data_(std::move(audio_data))
         , desc_(desc)
-        , tag_(tag)
         , commit_(std::move(commit))
     {
     }
 };
 
-mutable_frame::mutable_frame(const void*                      tag,
-                             std::vector<array<std::uint8_t>> image_data,
+mutable_frame::mutable_frame(std::vector<array<std::uint8_t>> image_data,
                              array<int32_t>                   audio_data,
                              const core::pixel_format_desc&   desc,
                              commit_t                         commit)
-    : impl_(new impl(tag, std::move(image_data), std::move(audio_data), desc, std::move(commit)))
+    : impl_(new impl(std::move(image_data), std::move(audio_data), desc, std::move(commit)))
 {
 }
 mutable_frame::mutable_frame(mutable_frame&& other) noexcept

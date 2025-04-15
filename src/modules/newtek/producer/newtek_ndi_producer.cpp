@@ -216,7 +216,7 @@ struct newtek_ndi_producer : public core::frame_producer
                     a_frame->data[0]     = reinterpret_cast<uint8_t*>(audio_frame_32s.p_data);
                 }
                 auto mframe =
-                    ffmpeg::make_frame(this, *(frame_factory_.get()), std::move(av_frame), std::move(a_frame));
+                    ffmpeg::make_frame(*(frame_factory_.get()), std::move(av_frame), std::move(a_frame));
                 delete[] audio_frame_32s.p_data;
                 auto dframe = core::draw_frame(std::move(mframe));
                 {

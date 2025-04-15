@@ -780,7 +780,7 @@ class decklink_producer : public IDeckLinkInputCallback
                 graph_->set_value("in-sync", in_sync * 2.0 + 0.5);
                 graph_->set_value("out-sync", out_sync * 2.0 + 0.5);
 
-                auto frame = core::draw_frame(make_frame(this, *frame_factory_, av_video, av_audio, color_space));
+                auto frame = core::draw_frame(make_frame(*frame_factory_, av_video, av_audio, color_space));
                 auto field = core::video_field::progressive;
                 if (format_desc_.field_count == 2) {
                     field = frame_count_ % 2 == 0 ? core::video_field::a : core::video_field::b;
@@ -963,6 +963,7 @@ spl::shared_ptr<core::frame_producer> create_producer(const core::frame_producer
     auto afilter = boost::to_lower_copy(get_param(L"AF", params, get_param(L"FILTER", params, L"")));
 
     return spl::make_shared<decklink_producer_proxy>(dependencies.format_desc,
+                                                     dependencies.frame_factory,
                                                               dependencies.frame_factory,
                                                               dependencies.format_repository,
                                                               device_index,

@@ -50,9 +50,8 @@ class image_mixer
 
     virtual std::future<std::any> render(const struct video_format_desc& format_desc) = 0;
 
-    class mutable_frame create_frame(const void* tag, const struct pixel_format_desc& desc) override = 0;
-    class mutable_frame create_frame(const void*                     video_stream_tag,
-                                     const struct pixel_format_desc& desc,
+    class mutable_frame create_frame(const struct pixel_format_desc& desc) override = 0;
+    class mutable_frame create_frame(const struct pixel_format_desc& desc,
                                      common::bit_depth               depth) override                               = 0;
 
     spl::shared_ptr<frame_converter> create_frame_converter() override = 0;

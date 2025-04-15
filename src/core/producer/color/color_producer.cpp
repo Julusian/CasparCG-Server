@@ -41,11 +41,11 @@
 namespace caspar { namespace core {
 
 draw_frame
-create_color_frame(void* tag, const spl::shared_ptr<frame_factory>& frame_factory, const std::vector<uint32_t>& values)
+create_color_frame(const spl::shared_ptr<frame_factory>& frame_factory, const std::vector<uint32_t>& values)
 {
     core::pixel_format_desc desc(pixel_format::bgra);
     desc.planes.push_back(core::pixel_format_desc::plane(static_cast<int>(values.size()), 1, 4));
-    auto frame = frame_factory->create_frame(tag, desc);
+    auto frame = frame_factory->create_frame(desc);
 
     for (int i = 0; i < values.size(); ++i)
         *reinterpret_cast<uint32_t*>(frame.image_data(0).begin() + i * 4) = values.at(i);
@@ -53,15 +53,14 @@ create_color_frame(void* tag, const spl::shared_ptr<frame_factory>& frame_factor
     return core::draw_frame(std::move(frame));
 }
 
-draw_frame create_color_frame(void* tag, const spl::shared_ptr<frame_factory>& frame_factory, uint32_t value)
+draw_frame create_color_frame(const spl::shared_ptr<frame_factory>& frame_factory, uint32_t value)
 {
     std::vector<uint32_t> values = {value};
 
-    return create_color_frame(tag, frame_factory, values);
+    return create_color_frame(frame_factory, values);
 }
 
-draw_frame create_color_frame(void*                                 tag,
-                              const spl::shared_ptr<frame_factory>& frame_factory,
+draw_frame create_color_frame(const spl::shared_ptr<frame_factory>& frame_factory,
                               const std::vector<std::wstring>&      strs)
 {
     std::vector<uint32_t> values(strs.size());
@@ -71,7 +70,7 @@ draw_frame create_color_frame(void*                                 tag,
             CASPAR_THROW_EXCEPTION(user_error() << msg_info(L"Invalid color: " + strs.at(i)));
     }
 
-    return create_color_frame(tag, frame_factory, values);
+    return create_color_frame(frame_factory, values);
 }
 
 class color_producer : public frame_producer
@@ -83,14 +82,14 @@ class color_producer : public frame_producer
 
   public:
     color_producer(const spl::shared_ptr<core::frame_factory>& frame_factory, uint32_t value)
-        : frame_(create_color_frame(this, frame_factory, value))
+        : frame_(create_color_frame(frame_factory, value))
     {
         CASPAR_LOG(info) << print() << L" Initialized";
     }
 
     color_producer(const spl::shared_ptr<core::frame_factory>& frame_factory, const std::vector<std::wstring>& colors)
         : color_str_(boost::join(colors, L", "))
-        , frame_(create_color_frame(this, frame_factory, colors))
+        , frame_(create_color_frame(frame_factory, colors))
     {
         state_["color"] = color_str_;
 
