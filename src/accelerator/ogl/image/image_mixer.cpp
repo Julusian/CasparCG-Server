@@ -49,6 +49,8 @@ using future_texture = std::shared_future<std::shared_ptr<texture>>;
 
 struct item
 {
+    int texture_width;
+    int texture_height;
     std::vector<future_texture> textures;
     draw_transforms             transforms;
     core::frame_geometry        geometry = core::frame_geometry::get_default();
@@ -239,9 +241,6 @@ class image_renderer
         draw_params draw_params;
         draw_params.target_width    = format_desc.square_width;
         draw_params.target_height   = format_desc.square_height;
-        draw_params.pix_desc.format = core::pixel_format::bgra;
-        draw_params.pix_desc.planes = {core::pixel_format_desc::plane(
-            source_texture->width(), source_texture->height(), 4, source_texture->depth())};
         draw_params.textures        = {spl::make_shared_ptr(source_texture)};
         draw_params.blend_mode      = blend_mode;
         draw_params.background      = target_texture;

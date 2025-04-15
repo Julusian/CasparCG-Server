@@ -31,9 +31,6 @@ class device;
 enum class texture_id
 {
     plane0 = 0,
-    plane1,
-    plane2,
-    plane3,
     local_key,
     layer_key,
     background

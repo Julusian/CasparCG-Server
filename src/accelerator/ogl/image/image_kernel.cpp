@@ -124,11 +124,12 @@ struct image_kernel::impl
 
         auto transforms = params.transforms;
 
-        auto const first_plane = params.pix_desc.planes.at(0);
-        if (params.geometry.mode() != core::frame_geometry::scale_mode::stretch && first_plane.width > 0 &&
-            first_plane.height > 0) {
-             auto width_scale  = static_cast<double>(params.target_width) / static_cast<double>(first_plane.width);
-             auto height_scale = static_cast<double>(params.target_height) / static_cast<double>(first_plane.height);
+        auto sample_texture = params.textures[0];
+
+        if (params.geometry.mode() != core::frame_geometry::scale_mode::stretch && sample_texture->width() > 0 &&
+            sample_texture->height() > 0) {
+             auto width_scale  = static_cast<double>(params.target_width) / static_cast<double>(sample_texture->width());
+             auto height_scale = static_cast<double>(params.target_height) / static_cast<double>(sample_texture->height());
 
             core::image_transform transform;
             double target_scale;
@@ -189,15 +190,8 @@ struct image_kernel::impl
             params.layer_key->bind(static_cast<int>(texture_id::layer_key));
         }
 
-        const auto is_hd       = params.pix_desc.planes.at(0).height > 700;
-        const auto color_space = is_hd ? params.pix_desc.color_space : core::color_space::bt601;
 
-        const float color_matrices[3][9] = {
-            {1.0, 0.0, 1.402, 1.0, -0.344, -0.509, 1.0, 1.772, 0.0},                          // bt.601
-            {1.0, 0.0, 1.5748, 1.0, -0.1873, -0.4681, 1.0, 1.8556, 0.0},                      // bt.709
-            {1.0, 0.0, 1.4746, 1.0, -0.16455312684366, -0.57135312684366, 1.0, 1.8814, 0.0}}; // bt.2020
-        const auto color_matrix = color_matrices[static_cast<int>(color_space)];
-
+        auto color_space = core::color_space::bt709; // TODO - what should this do?
         const float luma_coefficients[3][3] = {{0.299, 0.587, 0.114},     // bt.601
                                                {0.2126, 0.7152, 0.0722},  // bt.709
                                                {0.2627, 0.6780, 0.0593}}; // bt.2020
@@ -206,22 +200,18 @@ struct image_kernel::impl
         // Setup shader
         shader_->use();
 
-        shader_->set("is_straight_alpha", params.pix_desc.is_straight_alpha);
-        shader_->set("plane[0]", texture_id::plane0);
-        shader_->set("plane[1]", texture_id::plane1);
-        shader_->set("plane[2]", texture_id::plane2);
-        shader_->set("plane[3]", texture_id::plane3);
+        // shader_->set("is_straight_alpha", params.pix_desc.is_straight_alpha);
+        shader_->set("plane", texture_id::plane0);
         shader_->set("precision_factor[0]", precision_factor[0]);
         shader_->set("precision_factor[1]", precision_factor[1]);
         shader_->set("precision_factor[2]", precision_factor[2]);
         shader_->set("precision_factor[3]", precision_factor[3]);
         shader_->set("local_key", texture_id::local_key);
         shader_->set("layer_key", texture_id::layer_key);
-        shader_->set_matrix3("color_matrix", color_matrix);
         shader_->set("luma_coeff", luma_coeff[0], luma_coeff[1], luma_coeff[2]);
         shader_->set("has_local_key", static_cast<bool>(params.local_key));
         shader_->set("has_layer_key", static_cast<bool>(params.layer_key));
-        shader_->set("pixel_format", params.pix_desc.format);
+        // shader_->set("pixel_format", params.pix_desc.format);
         shader_->set("opacity",
                      transforms.image_transform.is_key ? 1.0 : transforms.image_transform.opacity);
 
