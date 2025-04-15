@@ -54,7 +54,7 @@ class image_mixer
     class mutable_frame create_frame(const struct pixel_format_desc& desc,
                                      common::bit_depth               depth) override                               = 0;
 
-    spl::shared_ptr<frame_converter> create_frame_converter() override = 0;
+    virtual spl::shared_ptr<frame_converter> create_frame_converter() = 0;
 
     virtual common::bit_depth depth() const       = 0;
     virtual core::color_space color_space() const = 0;

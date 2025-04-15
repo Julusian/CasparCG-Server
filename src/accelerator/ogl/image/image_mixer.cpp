@@ -369,7 +369,7 @@ struct image_mixer::impl
                                    });
     }
 
-    spl::shared_ptr<core::frame_converter> create_frame_converter() override
+    spl::shared_ptr<core::frame_converter> create_frame_converter()
     {
         return spl::make_shared<ogl_frame_converter>(ogl_);
     }
