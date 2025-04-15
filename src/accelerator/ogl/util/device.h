@@ -49,7 +49,7 @@ class device final
     device& operator=(const device&) = delete;
 
     std::shared_ptr<class texture> create_texture(int width, int height, int stride, common::bit_depth depth);
-    array<uint8_t>                 create_array(int size);
+    std::shared_ptr<class buffer> create_buffer(int size, bool write);
 
     std::future<std::shared_ptr<class texture>>
     copy_async(const array<const uint8_t>& source, int width, int height, int stride, common::bit_depth depth);

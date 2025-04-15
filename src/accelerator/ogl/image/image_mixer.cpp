@@ -328,16 +328,26 @@ struct image_mixer::impl
     core::mutable_frame
     create_frame(const core::pixel_format_desc& desc, common::bit_depth depth) override
     {
-        std::vector<array<std::uint8_t>> image_data;
+        int total_size = 0;
         for (auto& plane : desc.planes) {
-            image_data.push_back(ogl_->create_array(plane.size * bytes_per_pixel(depth)));
+            total_size += plane.size;
+        }
+
+        // create a single buffer
+        auto ogl_buffer = ogl_->create_buffer(total_size, true);
+
+        std::vector<array<std::uint8_t>> image_data;
+        int offset = 0;
+        for (auto& plane : desc.planes) {
+            image_data.emplace_back(static_cast<uint8_t*>(ogl_buffer->data()) + offset * sizeof(uint8_t), plane.size, ogl_buffer);
+            offset += plane.size;
         }
 
         std::weak_ptr<image_mixer::impl> weak_self = shared_from_this();
         return core::mutable_frame(std::move(image_data),
                                    array<int32_t>{},
                                    desc,
-                                   [weak_self, desc](std::vector<array<const std::uint8_t>> image_data) -> std::any {
+                                   [weak_self, desc, ogl_buffer = std::move(ogl_buffer)](std::vector<array<const std::uint8_t>> image_data) -> std::any {
                                        auto self = weak_self.lock();
                                        if (!self) {
                                            return std::any{};
@@ -350,6 +360,9 @@ struct image_mixer::impl
                                                                                         desc.planes[n].stride,
                                                                                         desc.planes[n].depth));
                                        }
+
+                                       // TODO - ditch all this and use combined_buffer instead!
+
                                        return std::make_shared<decltype(textures)>(std::move(textures));
                                    });
     }

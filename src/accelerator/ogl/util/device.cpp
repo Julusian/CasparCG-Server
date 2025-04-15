@@ -226,13 +226,6 @@ struct device::impl : public std::enable_shared_from_this<impl>
         });
     }
 
-    array<uint8_t> create_array(int size)
-    {
-        auto buf = create_buffer(size, true);
-        auto ptr = reinterpret_cast<uint8_t*>(buf->data());
-        return array<uint8_t>(ptr, buf->size(), std::move(buf));
-    }
-
     std::future<std::shared_ptr<texture>>
     copy_async(const array<const uint8_t>& source, int width, int height, int stride, common::bit_depth depth)
     {
@@ -299,12 +292,11 @@ struct device::impl : public std::enable_shared_from_this<impl>
             GL(glBindImageTexture(0, texid_16bit, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA16));
             GL(glBindImageTexture(1, texid_8bit, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA8));
 
-            array<const uint8_t> output_buffer = create_array(buffer_size); // TODO - tidy this?
-            auto                 buffer_ptr    = output_buffer.storage<std::shared_ptr<buffer>>();
+            std::shared_ptr<buffer> buffer_ptr = create_buffer(buffer_size, false);
             if (!buffer_ptr) {
                 CASPAR_THROW_EXCEPTION(caspar_exception() << msg_info("Buffer is not gpu backed"));
             }
-            GL(glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, buffer_ptr->get()->id()));
+            GL(glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, buffer_ptr->id()));
 
             auto description_buffer = create_buffer(sizeof(convert_from_texture_description), false);
             std::memcpy(description_buffer->data(), &description, sizeof(convert_from_texture_description));
@@ -330,7 +322,8 @@ struct device::impl : public std::enable_shared_from_this<impl>
 
             glDeleteSync(fence);
 
-            return output_buffer;
+            auto ptr = reinterpret_cast<uint8_t*>(buffer_ptr->data());
+            return array<const uint8_t>(ptr, buffer_ptr->size(), std::move(buffer_ptr));
         });
     }
 
@@ -452,7 +445,7 @@ std::shared_ptr<texture> device::create_texture(int width, int height, int strid
 {
     return impl_->create_texture(width, height, stride, depth, true);
 }
-array<uint8_t> device::create_array(int size) { return impl_->create_array(size); }
+std::shared_ptr<class buffer> device::create_buffer(int size, bool write) { return impl_->create_buffer(size, write); }
 std::future<std::shared_ptr<texture>>
 device::copy_async(const array<const uint8_t>& source, int width, int height, int stride, common::bit_depth depth)
 {
