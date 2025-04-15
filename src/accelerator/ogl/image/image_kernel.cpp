@@ -107,9 +107,7 @@ struct image_kernel::impl
 
     void draw(draw_params params)
     {
-        CASPAR_ASSERT(params.pix_desc.planes.size() == params.textures.size());
-
-        if (params.textures.empty() || !params.background) {
+        if (!params.texture || !params.background) {
             return;
         }
 
@@ -124,12 +122,12 @@ struct image_kernel::impl
 
         auto transforms = params.transforms;
 
-        auto sample_texture = params.textures[0];
+        auto texture = params.texture;
 
-        if (params.geometry.mode() != core::frame_geometry::scale_mode::stretch && sample_texture->width() > 0 &&
-            sample_texture->height() > 0) {
-             auto width_scale  = static_cast<double>(params.target_width) / static_cast<double>(sample_texture->width());
-             auto height_scale = static_cast<double>(params.target_height) / static_cast<double>(sample_texture->height());
+        if (params.geometry.mode() != core::frame_geometry::scale_mode::stretch && texture->width() > 0 &&
+            texture->height() > 0) {
+             auto width_scale  = static_cast<double>(params.target_width) / static_cast<double>(texture->width());
+             auto height_scale = static_cast<double>(params.target_height) / static_cast<double>(texture->height());
 
             core::image_transform transform;
             double target_scale;
@@ -173,14 +171,10 @@ struct image_kernel::impl
             return;
         }
 
-        double precision_factor[4] = {1, 1, 1, 1};
 
-        // Bind textures
-
-        for (int n = 0; n < params.textures.size(); ++n) {
-            params.textures[n]->bind(n);
-            precision_factor[n] = get_precision_factor(params.textures[n]->depth());
-        }
+        // Bind texture
+        double precision_factor = get_precision_factor(params.texture->depth());
+        params.texture->bind(0);
 
         if (params.local_key) {
             params.local_key->bind(static_cast<int>(texture_id::local_key));
@@ -200,18 +194,13 @@ struct image_kernel::impl
         // Setup shader
         shader_->use();
 
-        // shader_->set("is_straight_alpha", params.pix_desc.is_straight_alpha);
         shader_->set("plane", texture_id::plane0);
-        shader_->set("precision_factor[0]", precision_factor[0]);
-        shader_->set("precision_factor[1]", precision_factor[1]);
-        shader_->set("precision_factor[2]", precision_factor[2]);
-        shader_->set("precision_factor[3]", precision_factor[3]);
+        shader_->set("precision_factor", precision_factor);
         shader_->set("local_key", texture_id::local_key);
         shader_->set("layer_key", texture_id::layer_key);
         shader_->set("luma_coeff", luma_coeff[0], luma_coeff[1], luma_coeff[2]);
         shader_->set("has_local_key", static_cast<bool>(params.local_key));
         shader_->set("has_layer_key", static_cast<bool>(params.layer_key));
-        // shader_->set("pixel_format", params.pix_desc.format);
         shader_->set("opacity",
                      transforms.image_transform.is_key ? 1.0 : transforms.image_transform.opacity);
 

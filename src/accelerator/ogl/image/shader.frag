@@ -22,7 +22,7 @@ uniform float		max_input;
 uniform float		gamma;
 uniform float		min_output;
 uniform float		max_output;
-uniform float	    precision_factor[4];
+uniform float	    precision_factor;
 
 uniform bool		csb;
 uniform float		brt;
@@ -441,7 +441,7 @@ vec4 get_sample(sampler2D sampler, vec2 coords)
 
 void main()
 {
-    vec4 color = get_sample(plane, TexCoord.st / TexCoord.q).bgra * precision_factor[0];
+    vec4 color = get_sample(plane, TexCoord.st / TexCoord.q).bgra * precision_factor;
     if (chroma)
         color = chroma_key(color);
     if(levels)

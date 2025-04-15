@@ -49,9 +49,7 @@ using future_texture = std::shared_future<std::shared_ptr<texture>>;
 
 struct item
 {
-    int texture_width;
-    int texture_height;
-    std::vector<future_texture> textures;
+    future_texture texture;
     draw_transforms             transforms;
     core::frame_geometry        geometry = core::frame_geometry::get_default();
 };
@@ -183,16 +181,12 @@ class image_renderer
         draw_params draw_params;
         draw_params.target_width  = format_desc.square_width;
         draw_params.target_height = format_desc.square_height;
-        // TODO: Pass the target color_space
-
         draw_params.transforms = std::move(item.transforms);
         draw_params.geometry   = std::move(item.geometry);
         draw_params.aspect_ratio =
             static_cast<double>(format_desc.square_width) / static_cast<double>(format_desc.square_height);
 
-        for (auto& future_texture : item.textures) {
-            draw_params.textures.push_back(spl::make_shared_ptr(future_texture.get()));
-        }
+        draw_params.texture = item.texture.get();
 
         if (draw_params.transforms.image_transform
                 .is_key) { // A key means we will use it for the next non-key item as a mask
@@ -241,7 +235,7 @@ class image_renderer
         draw_params draw_params;
         draw_params.target_width    = format_desc.square_width;
         draw_params.target_height   = format_desc.square_height;
-        draw_params.textures        = {spl::make_shared_ptr(source_texture)};
+        draw_params.texture         = spl::make_shared_ptr(source_texture);
         draw_params.blend_mode      = blend_mode;
         draw_params.background      = target_texture;
         draw_params.geometry        = core::frame_geometry::get_default();
@@ -303,10 +297,11 @@ struct image_mixer::impl
         item.transforms = transform_stack_.back();
         item.geometry   = frame.geometry();
 
+        // TODO - this shouldn't be a vector anymore...
         auto textures_ptr = std::any_cast<std::shared_ptr<std::vector<future_texture>>>(frame.image_ptr());
 
         if (textures_ptr) {
-            item.textures = *textures_ptr;
+            item.texture = textures_ptr->at(0);
         } else {
             CASPAR_LOG(debug) << "Skipping drawing frame which has no textures";
         }

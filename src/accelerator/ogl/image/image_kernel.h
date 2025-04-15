@@ -27,7 +27,6 @@
 
 #include <core/frame/frame_transform.h>
 #include <core/frame/geometry.h>
-#include <core/frame/pixel_format.h>
 
 #include <utility>
 
@@ -44,7 +43,7 @@ enum class keyer
 
 struct draw_params final
 {
-    std::vector<spl::shared_ptr<class texture>> textures;
+    std::shared_ptr<class texture> texture;
     draw_transforms                             transforms;
     core::frame_geometry                        geometry   = core::frame_geometry::get_default();
     core::blend_mode                            blend_mode = core::blend_mode::normal;
