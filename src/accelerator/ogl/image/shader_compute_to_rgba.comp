@@ -112,7 +112,7 @@ uint read_from_plane(uint planeIndex, uint offset) {
 
 uint read_component(uint planeIndex, uint planeWidth, bool planeHalfHeight, ivec2 coord, bool is_16bit) {
 
-    uint row_offset = coord.y * planeWidth;
+    uint row_offset = coord.y;
     uint col_offset = coord.x;
 
     // TODO - something here is off..
@@ -123,15 +123,29 @@ uint read_component(uint planeIndex, uint planeWidth, bool planeHalfHeight, ivec
 
     // Future: should this interpolate?
     uint value_index = col_offset % 4;
-    uint byte_offset = (row_offset + col_offset) / 4;
+    uint byte_offset = (row_offset * planeWidth + col_offset) / 4;
 
     uint shift = value_index * 8;
 
     return (read_from_plane(planeIndex, byte_offset) >> shift) & 0xff;
 }
 
+// Input expects to be floats containing 8bit values (0-255). for higher depths, scale them to be in the range of 8 first
+vec4 ycbcra_to_rgba(uint Y, uint Cb, uint Cr, uint A)
+{
+    const float luma_coefficient = 255.0/219.0;
+    const float chroma_coefficient = 255.0/224.0;
+
+    const mat3 color_matrix = mat3(1.0, 0.0, 1.5748, 1.0, -0.1873, -0.4681, 1.0, 1.8556, 0.0); // TODO - non 709 values
+
+    vec3 YCbCr = vec3(float(Y), float(Cb), float(Cr));
+    YCbCr -= vec3(16.0, 128.0, 128.0);
+    YCbCr *= vec3(luma_coefficient, chroma_coefficient, chroma_coefficient);
+
+    return vec4(YCbCr * color_matrix / 255, A / 255.0);//.bgra;
+}
+
 void main() {
-    vec4 value = vec4(0.0, 0.0, 0.0, 1.0);
     ivec2 texelCoord = ivec2(gl_GlobalInvocationID.xy);
 
     // TODO - assumes ycbcr 8bit for now
@@ -142,14 +156,7 @@ void main() {
     uint cb = read_component(1, plane1_linewidth, plane1_half_height > 0, texelCoord, plane1_depth > 0);
     uint cr = read_component(2, plane2_linewidth, plane2_half_height > 0, texelCoord, plane2_depth > 0);
 
-
-
-    value.r = luma / 255.0;
-    value.g = cb / 255.0;
-    value.b = cr / 255.0;
-
-//    value.r = float(texelCoord.x)/(gl_NumWorkGroups.x);
-//    value.g = float(texelCoord.y)/(gl_NumWorkGroups.y);
+    vec4 value = ycbcra_to_rgba(luma, cb, cr, 255);
 
     write_pixel(texelCoord, value);
 }
