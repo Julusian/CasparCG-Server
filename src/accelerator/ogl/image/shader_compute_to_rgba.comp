@@ -130,19 +130,99 @@ uint read_component(uint planeIndex, uint planeWidth, bool planeHalfHeight, ivec
     return (read_from_plane(planeIndex, byte_offset) >> shift) & 0xff;
 }
 
-// Input expects to be floats containing 8bit values (0-255). for higher depths, scale them to be in the range of 8 first
-vec4 ycbcra_to_rgba(uint Y, uint Cb, uint Cr, uint A)
+// Input expects to be floats containing 0 - 1.0
+vec4 ycbcra_to_rgba(float Y, float Cb, float Cr, float A)
 {
+    const float luma_offset = 16.0/255.0;
     const float luma_coefficient = 255.0/219.0;
     const float chroma_coefficient = 255.0/224.0;
 
     const mat3 color_matrix = mat3(1.0, 0.0, 1.5748, 1.0, -0.1873, -0.4681, 1.0, 1.8556, 0.0); // TODO - non 709 values
 
-    vec3 YCbCr = vec3(float(Y), float(Cb), float(Cr));
-    YCbCr -= vec3(16.0, 128.0, 128.0);
+    vec3 YCbCr = vec3(Y, Cb, Cr);
+    YCbCr -= vec3(luma_offset, 0.5, 0.5);
     YCbCr *= vec3(luma_coefficient, chroma_coefficient, chroma_coefficient);
 
-    return vec4(YCbCr * color_matrix / 255, A / 255.0);//.bgra;
+    return vec4(YCbCr * color_matrix, A);//.bgra;
+}
+
+vec4 read_rgba_value_from_plane0(ivec2 coord) {
+    uint offset = coord.y * plane0_linewidth / 4 + coord.x;
+
+    // TODO - 16bit
+    uint raw_value = bufferInput0[offset];
+
+    float val0 = (raw_value) & 0xff;
+    float val1 = (raw_value >> 8) & 0xff;
+    float val2 = (raw_value >> 16) & 0xff;
+    float val3 = (raw_value >> 24) & 0xff;
+
+    return vec4(val0/255, val1/255, val2/255, val3/255);
+}
+
+vec4 get_rgba_color(ivec2 texelCoord) {
+    switch(source_format)
+    {
+//        case 0:		//gray
+//            return vec4(get_sample(plane[0], texelCoord).rrr * precision_factor[0], 1.0);
+        case 1:		//bgra,
+            return read_rgba_value_from_plane0(texelCoord).bgra;
+        case 2:		//rgba,
+            return read_rgba_value_from_plane0(texelCoord);
+        case 3:		//argb,
+            // TODO - test
+            return read_rgba_value_from_plane0(texelCoord).argb;
+        case 4:		//abgr,
+            // TODO - test
+            return read_rgba_value_from_plane0(texelCoord).abgr;
+        case 5:		//ycbcr,
+            {
+                float luma = read_component(0, plane0_linewidth, false, texelCoord, plane0_depth > 0);
+                float cb = read_component(1, plane1_linewidth, plane1_half_height > 0, texelCoord, plane1_depth > 0);
+                float cr = read_component(2, plane2_linewidth, plane2_half_height > 0, texelCoord, plane2_depth > 0);
+                vec4 value = ycbcra_to_rgba(luma / 255.0, cb / 255.0, cr / 255.0, 1.0);
+            }
+//        case 6:		//ycbcra
+//            {
+//                float y  = get_sample(plane[0], texelCoord).r * precision_factor[0];
+//                float cb = get_sample(plane[1], texelCoord).r * precision_factor[1];
+//                float cr = get_sample(plane[2], texelCoord).r * precision_factor[2];
+//                float a  = get_sample(plane[3], texelCoord).r * precision_factor[3];
+//                return ycbcra_to_rgba(y, cb, cr, a);
+//            }
+//        case 7:		//luma
+//            {
+//                vec3 y3 = get_sample(plane[0], texelCoord).rrr * precision_factor[0];
+//                return vec4((y3-0.065)/0.859, 1.0);
+//            }
+//        case 8:		//bgr,
+//            return vec4(get_sample(plane[0], texelCoord).bgr * precision_factor[0], 1.0);
+//        case 9:		//rgb,
+//            return vec4(get_sample(plane[0], texelCoord).rgb * precision_factor[0], 1.0);
+//        case 10:	// uyvy
+//            {
+//                float y = get_sample(plane[0], texelCoord).g * precision_factor[0];
+//                float cb = get_sample(plane[1], texelCoord).b * precision_factor[1];
+//                float cr = get_sample(plane[1], texelCoord).r * precision_factor[1];
+//                return ycbcra_to_rgba(y, cb, cr, 1.0);
+//            }
+//        case 11:    // gbrp
+//            {
+//                float g  = get_sample(plane[0], texelCoord).r * precision_factor[0];
+//                float b = get_sample(plane[1], texelCoord).r * precision_factor[1];
+//                float r = get_sample(plane[2], texelCoord).r * precision_factor[2];
+//                return vec4(b, g, r, 1.0);
+//            }
+//        case 12:    // gbrap
+//            {
+//                float g  = get_sample(plane[0], texelCoord).r * precision_factor[0];
+//                float b = get_sample(plane[1], texelCoord).r * precision_factor[1];
+//                float r = get_sample(plane[2], texelCoord).r * precision_factor[2];
+//                float a  = get_sample(plane[3], texelCoord).r * precision_factor[3];
+//                return vec4(b, g, r, a);
+//            }
+    }
+    return vec4(0.0, 0.0, 0.0, 0.0);
 }
 
 void main() {
@@ -152,11 +232,14 @@ void main() {
 
     // TODO - half height planes?
     // TODO - more general subsampling?
-    uint luma = read_component(0, plane0_linewidth, false, texelCoord, plane0_depth > 0);
-    uint cb = read_component(1, plane1_linewidth, plane1_half_height > 0, texelCoord, plane1_depth > 0);
-    uint cr = read_component(2, plane2_linewidth, plane2_half_height > 0, texelCoord, plane2_depth > 0);
+//    float luma = read_component(0, plane0_linewidth, false, texelCoord, plane0_depth > 0);
+//    float cb = read_component(1, plane1_linewidth, plane1_half_height > 0, texelCoord, plane1_depth > 0);
+//    float cr = read_component(2, plane2_linewidth, plane2_half_height > 0, texelCoord, plane2_depth > 0);
+//
+//    vec4 value = ycbcra_to_rgba(luma / 255.0, cb / 255.0, cr / 255.0, 1.0);
 
-    vec4 value = ycbcra_to_rgba(luma, cb, cr, 255);
+    vec4 value = get_rgba_color(texelCoord);
 
+    // out of this should be RGBA (in that order)
     write_pixel(texelCoord, value);
 }

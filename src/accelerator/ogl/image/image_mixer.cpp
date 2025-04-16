@@ -380,74 +380,30 @@ struct image_mixer::impl
         description.width = desc.planes[0].width;
         description.height = desc.planes[0].height;
 
-        description.source_format = 0;
+        description.source_format = static_cast<uint32_t>(desc.format);
 
         // TODO - more properties?
 
-        core::pixel_format_desc::plane plane0 = desc.planes[0];
-        core::pixel_format_desc::plane plane1;
-        core::pixel_format_desc::plane plane2;
-        core::pixel_format_desc::plane plane3;
 
-        // TODO - pick out planes
-        // TODO - this feels messy... maybe the previous approach of pass it all through and let the shader figure out which plane is which is betteR?
-        switch (desc.format) {
-            case core::pixel_format::gray:
-                break;
-            case core::pixel_format::bgra:
-                break;
-            case core::pixel_format::rgba:
-                break;
-            case core::pixel_format::argb:
-                break;
-            case core::pixel_format::abgr:
-                break;
-            case core::pixel_format::ycbcra:
-                description.source_format = 1; // pycbcra
-                plane1 = desc.planes[1];
-                plane2 = desc.planes[2];
-                plane3 = desc.planes[3];
-            break;
-            case core::pixel_format::ycbcr:
-                description.source_format = 1; // pycbcr
-                plane1 = desc.planes[1];
-                plane2 = desc.planes[2];
-                break;
-            case core::pixel_format::luma:
-                break;
-            case core::pixel_format::bgr:
-                break;
-            case core::pixel_format::rgb:
-                break;
-            case core::pixel_format::uyvy:
-                break;
-            case core::pixel_format::gbrp:
-                break;
-            case core::pixel_format::gbrap:
-                break;
-            case core::pixel_format::count:
-            case core::pixel_format::invalid:
-                break;
-        }
 
-        if (description.source_format == 0) {
-            // TODO - throw error
-        }
-
+        auto& plane0 = desc.planes[0];
         description.plane0_depth = static_cast<uint32_t>(plane0.depth);
         description.plane0_linewidth = plane0.linesize;
 
-        if (plane1.width > 0) {
+        if (desc.planes.size() > 1) {
+            auto& plane1 = desc.planes[1];
             description.plane1_depth = static_cast<uint32_t>(plane1.depth);
             description.plane1_linewidth = plane1.linesize;
             description.plane1_half_height = plane1.height < plane0.height;
         }
-        if (plane2.width > 0) {
+        if (desc.planes.size() > 2) {
+            auto& plane2 = desc.planes[2];
             description.plane2_depth = static_cast<uint32_t>(plane2.depth);
             description.plane2_linewidth = plane2.linesize;
             description.plane2_half_height = plane2.height < plane0.height;
         }
-        if (plane3.width > 0) {
+        if (desc.planes.size() > 3) {
+            auto& plane3 = desc.planes[3];
             description.plane3_depth = static_cast<uint32_t>(plane3.depth);
             description.plane3_linewidth = plane3.linesize;
             description.plane3_half_height = plane3.height < plane0.height;
