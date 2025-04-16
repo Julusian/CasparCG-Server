@@ -26,12 +26,29 @@ layout (local_size_x = 32, local_size_y = 32, local_size_z = 1) in;
 layout(rgba16, binding = 0) uniform image2D imgOutput16bit; // Note: this needs to match what it is writing to
 layout(rgba8, binding = 1) uniform image2D imgOutput8bit; // Note: this needs to match what it is writing to
 
-layout(std430, binding = 2) readonly buffer buffer_layout
+/**
+ * We want these buffers to use as large a uint as possible, because the larger they are the less likely we are to need to do 2 memory reads per buffer.
+ * As memory is wider than a color component is, I asusme that we wont hit that.
+ * 16bit feels like a sensible compromise for planar formats.
+ */
+layout(std430, binding = 2) readonly buffer buffer_plane0
 {
-    uint bufferInput[];
+    uint bufferInput0[];
+};
+layout(std430, binding = 3) readonly buffer buffer_plane1
+{
+    uint bufferInput1[];
+};
+layout(std430, binding = 4) readonly buffer buffer_plane2
+{
+    uint bufferInput2[];
+};
+layout(std430, binding = 5) readonly buffer buffer_plane3
+{
+    uint bufferInput3[];
 };
 
-layout(std430, binding = 3) buffer description_layout
+layout(std430, binding = 6) buffer description_layout
 {
     // This must match convert_from_texture_description in device.h
     uint is_16_bit;
@@ -43,13 +60,20 @@ layout(std430, binding = 3) buffer description_layout
 
     uint source_format;
 
-    uint plane0_offset;
+    uint plane0_linewidth;
+    uint plane0_depth;
 
-    uint plane1_offset;
+    uint plane1_linewidth;
+    uint plane1_depth;
+    uint plane1_half_height;
 
-    uint plane2_offset;
+    uint plane2_linewidth;
+    uint plane2_depth;
+    uint plane2_half_height;
 
-    uint plane3_offset;
+    uint plane3_linewidth;
+    uint plane3_depth;
+    uint plane3_half_height;
 };
 
 vec4 premultiply_pixel(vec4 pixel) {
@@ -71,15 +95,58 @@ void write_pixel(ivec2 coord, vec4 color) {
     }
 }
 
+uint read_from_plane(uint planeIndex, uint offset) {
+    switch(planeIndex) {
+        case 0:
+            return bufferInput0[offset];
+        case 1:
+            return bufferInput1[offset];
+        case 2:
+            return bufferInput2[offset];
+        case 3:
+            return bufferInput3[offset];
+    }
+
+    return 0;
+}
+
+uint read_component(uint planeIndex, uint planeWidth, bool planeHalfHeight, ivec2 coord, bool is_16bit) {
+
+    uint row_offset = coord.y * planeWidth;
+    uint col_offset = coord.x;
+
+    // TODO - something here is off..
+    if (planeHalfHeight) row_offset /= 2; // Future: interpolation?
+    if (planeWidth < frame_width) col_offset /= 2;  // Future: interpolation?
+
+    // TODO - handle >8bit
+
+    // Future: should this interpolate?
+    uint value_index = col_offset % 4;
+    uint byte_offset = (row_offset + col_offset) / 4;
+
+    uint shift = value_index * 8;
+
+    return (read_from_plane(planeIndex, byte_offset) >> shift) & 0xff;
+}
+
 void main() {
     vec4 value = vec4(0.0, 0.0, 0.0, 1.0);
     ivec2 texelCoord = ivec2(gl_GlobalInvocationID.xy);
 
+    // TODO - assumes ycbcr 8bit for now
+
+    // TODO - half height planes?
+    // TODO - more general subsampling?
+    uint luma = read_component(0, plane0_linewidth, false, texelCoord, plane0_depth > 0);
+    uint cb = read_component(1, plane1_linewidth, plane1_half_height > 0, texelCoord, plane1_depth > 0);
+    uint cr = read_component(2, plane2_linewidth, plane2_half_height > 0, texelCoord, plane2_depth > 0);
 
 
-    value.r = ((bufferInput[gl_GlobalInvocationID.x] >> 24) & 0xff) / 255.0;
-    value.g = ((bufferInput[gl_GlobalInvocationID.x] >> 16) & 0xff) / 255.0;
-    value.b = ((bufferInput[gl_GlobalInvocationID.x] >> 8) & 0xff) / 255.0;
+
+    value.r = luma / 255.0;
+    value.g = cb / 255.0;
+    value.b = cr / 255.0;
 
 //    value.r = float(texelCoord.x)/(gl_NumWorkGroups.x);
 //    value.g = float(texelCoord.y)/(gl_NumWorkGroups.y);

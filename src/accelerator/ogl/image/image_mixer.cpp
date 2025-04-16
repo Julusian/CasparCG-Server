@@ -333,36 +333,41 @@ struct image_mixer::impl
                                        << msg_info(L"Frame must have at least one plane, but not more than 4."));
         }
 
-        int total_size = 0;
-        for (auto& plane : desc.planes) {
-            total_size += plane.size;
-        }
+        // int total_size = 0;
+        // for (auto& plane : desc.planes) {
+        //     total_size += plane.size;
+        // }
 
         // create a single buffer
-        auto ogl_buffer = ogl_->create_buffer(total_size, true);
+        // auto ogl_buffer = ogl_->create_buffer(total_size, true);
+
+
+        // TODO - maybe this should be reverted a bit?
+        std::vector<std::shared_ptr<buffer>> ogl_buffers;
 
         std::vector<array<std::uint8_t>> image_data;
-        int offset = 0;
+        // int offset = 0;
         for (auto& plane : desc.planes) {
-            image_data.emplace_back(static_cast<uint8_t*>(ogl_buffer->data()) + offset * sizeof(uint8_t), plane.size, ogl_buffer);
-            offset += plane.size;
+            auto buffer = ogl_->create_buffer(plane.size, true);
+            image_data.emplace_back(static_cast<uint8_t*>(buffer->data()), buffer->size(), buffer);
+            ogl_buffers.emplace_back(std::move(buffer));
         }
 
         std::weak_ptr<image_mixer::impl> weak_self = shared_from_this();
         return core::mutable_frame(std::move(image_data),
                                    array<int32_t>{},
                                    desc,
-                                   [weak_self, desc, ogl_buffer = std::move(ogl_buffer)]() -> std::any {
+                                   [weak_self, desc, ogl_buffers = std::move(ogl_buffers)]() -> std::any {
                                        auto self = weak_self.lock();
                                        if (!self) {
                                            return std::any{};
                                        }
 
-                                       return self->convert_buffer_to_texture(ogl_buffer, desc);
+                                       return self->convert_buffer_to_texture(ogl_buffers, desc);
                                    });
     }
 
-    future_texture convert_buffer_to_texture(const std::shared_ptr<buffer> &ogl_buffer, const core::pixel_format_desc& desc)
+    future_texture convert_buffer_to_texture(const std::vector<std::shared_ptr<buffer>> &ogl_buffers, const core::pixel_format_desc& desc)
     {
         bool to_16bit = false;
         for (auto& plane : desc.planes) {
@@ -379,23 +384,80 @@ struct image_mixer::impl
 
         // TODO - more properties?
 
-        // description.plane0_offset = 0;
+        core::pixel_format_desc::plane plane0 = desc.planes[0];
+        core::pixel_format_desc::plane plane1;
+        core::pixel_format_desc::plane plane2;
+        core::pixel_format_desc::plane plane3;
 
-        // if (desc.planes.size() > 1) {
-        //     description.plane1_offset = description.plane0_offset + desc.planes[0].size;
-        // }
-        // if (desc.planes.size() > 2) {
-        //     description.plane2_offset = description.plane1_offset + desc.planes[1].size;
-        // }
-        // if (desc.planes.size() > 3) {
-        //     description.plane3_offset = description.plane2_offset + desc.planes[2].size;
-        // }
+        // TODO - pick out planes
+        // TODO - this feels messy... maybe the previous approach of pass it all through and let the shader figure out which plane is which is betteR?
+        switch (desc.format) {
+            case core::pixel_format::gray:
+                break;
+            case core::pixel_format::bgra:
+                break;
+            case core::pixel_format::rgba:
+                break;
+            case core::pixel_format::argb:
+                break;
+            case core::pixel_format::abgr:
+                break;
+            case core::pixel_format::ycbcra:
+                description.source_format = 1; // pycbcra
+                plane1 = desc.planes[1];
+                plane2 = desc.planes[2];
+                plane3 = desc.planes[3];
+            break;
+            case core::pixel_format::ycbcr:
+                description.source_format = 1; // pycbcr
+                plane1 = desc.planes[1];
+                plane2 = desc.planes[2];
+                break;
+            case core::pixel_format::luma:
+                break;
+            case core::pixel_format::bgr:
+                break;
+            case core::pixel_format::rgb:
+                break;
+            case core::pixel_format::uyvy:
+                break;
+            case core::pixel_format::gbrp:
+                break;
+            case core::pixel_format::gbrap:
+                break;
+            case core::pixel_format::count:
+            case core::pixel_format::invalid:
+                break;
+        }
+
+        if (description.source_format == 0) {
+            // TODO - throw error
+        }
+
+        description.plane0_depth = static_cast<uint32_t>(plane0.depth);
+        description.plane0_linewidth = plane0.linesize;
+
+        if (plane1.width > 0) {
+            description.plane1_depth = static_cast<uint32_t>(plane1.depth);
+            description.plane1_linewidth = plane1.linesize;
+            description.plane1_half_height = plane1.height < plane0.height;
+        }
+        if (plane2.width > 0) {
+            description.plane2_depth = static_cast<uint32_t>(plane2.depth);
+            description.plane2_linewidth = plane2.linesize;
+            description.plane2_half_height = plane2.height < plane0.height;
+        }
+        if (plane3.width > 0) {
+            description.plane3_depth = static_cast<uint32_t>(plane3.depth);
+            description.plane3_linewidth = plane3.linesize;
+            description.plane3_half_height = plane3.height < plane0.height;
+        }
 
         // TODO - different when going to 16bit?
         unsigned int x_count = (description.width + 31) / 32;
         unsigned int y_count = (description.height + 31) / 32;
 
-        return ogl_->convert_to_texture(ogl_buffer, description, x_count, y_count);
+        return ogl_->convert_to_texture(ogl_buffers, description, x_count, y_count);
     }
 
     spl::shared_ptr<core::frame_converter> create_frame_converter()

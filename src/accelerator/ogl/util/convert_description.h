@@ -56,15 +56,22 @@ struct convert_to_texture_description
   // uint32_t key_only;
   uint32_t premultiply;
 
-  uint32_t source_format;
+  uint32_t source_format = 0;
 
-  uint32_t plane0_offset = 0;
+  uint32_t plane0_linewidth = 0;
+  uint32_t plane0_depth = 0;
 
-  uint32_t plane1_offset = 0;
+  uint32_t plane1_linewidth = 0;
+  uint32_t plane1_depth = 0;
+  uint32_t plane1_half_height = 0;
 
-  uint32_t plane2_offset = 0;
+  uint32_t plane2_linewidth = 0;
+  uint32_t plane2_depth = 0;
+  uint32_t plane2_half_height = 0;
 
-  uint32_t plane3_offset = 0;
+  uint32_t plane3_linewidth = 0;
+  uint32_t plane3_depth = 0;
+  uint32_t plane3_half_height = 0;
 };
 
 } // namespace caspar::accelerator::ogl

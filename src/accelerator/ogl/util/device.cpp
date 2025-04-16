@@ -306,7 +306,7 @@ struct device::impl : public std::enable_shared_from_this<impl>
         });
     }
 
-    std::future<std::shared_ptr<texture>> convert_to_texture(const std::shared_ptr<buffer>&         buffer,
+    std::future<std::shared_ptr<texture>> convert_to_texture(const std::vector<std::shared_ptr<buffer>>&         buffers,
                                                                const convert_to_texture_description& description,
                                                                unsigned int                            x_count,
                                                                unsigned int                            y_count)
@@ -331,11 +331,14 @@ struct device::impl : public std::enable_shared_from_this<impl>
             GL(glBindImageTexture(0, texid_16bit, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA16));
             GL(glBindImageTexture(1, texid_8bit, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA8));
 
-            GL(glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, buffer->id()));
+            for (auto i = 0; i < 4; ++i) {
+                auto id = buffers.size() > i ? buffers.at(i)->id() : 0;
+                GL(glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2 + i, id));
+            }
 
             auto description_buffer = create_buffer(sizeof(convert_to_texture_description), false);
             std::memcpy(description_buffer->data(), &description, sizeof(convert_to_texture_description));
-            GL(glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, description_buffer->id()));
+            GL(glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, description_buffer->id()));
 
             compute_to_rgba_->use();
 
@@ -489,12 +492,12 @@ std::future<array<const uint8_t>> device::convert_from_texture(const std::shared
 {
     return impl_->convert_from_texture(texture, buffer_size, description, x_count, y_count);
 }
-std::future<std::shared_ptr<texture>> device::convert_to_texture(const std::shared_ptr<buffer>&         buffer,
+std::future<std::shared_ptr<texture>> device::convert_to_texture(const std::vector<std::shared_ptr<buffer>>&         buffers,
                                                        const convert_to_texture_description& description,
                                                        unsigned int                            x_count,
                                                        unsigned int                            y_count)
 {
-    return impl_->convert_to_texture(buffer, description, x_count, y_count);
+    return impl_->convert_to_texture(buffers, description, x_count, y_count);
 }
 
 void         device::dispatch(std::function<void()> func) { boost::asio::dispatch(impl_->service_, std::move(func)); }

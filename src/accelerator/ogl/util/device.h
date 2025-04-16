@@ -57,7 +57,7 @@ class device final
                                                            unsigned int                            x_count,
                                                            unsigned int                            y_count);
 
-    std::future<std::shared_ptr<texture>> convert_to_texture(const std::shared_ptr<buffer>&         buffer,
+    std::future<std::shared_ptr<texture>> convert_to_texture(const std::vector<std::shared_ptr<buffer>>&         buffers,
                                                            const convert_to_texture_description& description,
                                                              unsigned int                            x_count,
                                                            unsigned int                            y_count);
