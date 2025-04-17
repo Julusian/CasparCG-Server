@@ -138,6 +138,8 @@ class sting_producer : public frame_producer
             return dst_producer_->receive(field, nb_samples);
         }
 
+        // TODO - review/rewrite this
+
         auto src = src_.get(field);
         if (!src) {
             src = src_producer_->receive(field, nb_samples);
@@ -203,7 +205,7 @@ class sting_producer : public frame_producer
         return res;
     }
 
-    core::draw_frame first_frame(const core::video_field field) override { return dst_producer_->first_frame(field); }
+    core::draw_frame peek_frame(const core::video_field field) override { return dst_producer_->peek_frame(field); }
 
     uint32_t nb_frames() const override { return dst_producer_->nb_frames(); }
 

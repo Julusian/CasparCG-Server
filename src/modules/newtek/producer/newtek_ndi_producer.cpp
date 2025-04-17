@@ -129,6 +129,16 @@ struct newtek_ndi_producer : public core::frame_producer
 
     std::wstring name() const override { return L"ndi"; }
 
+
+    core::draw_frame peek_frame(const core::video_field field) override {
+        std::lock_guard<std::mutex> lock(frames_mutex_);
+        if (!frames_.empty()) {
+            return frames_.front();
+        }
+
+        return core::draw_frame{};
+    }
+
     core::draw_frame receive_impl(const core::video_field field, int nb_samples) override
     {
         // TODO - fields

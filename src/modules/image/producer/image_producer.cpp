@@ -88,7 +88,7 @@ struct image_producer : public core::frame_producer
 
     core::draw_frame last_frame(const core::video_field field) override { return frame_; }
 
-    core::draw_frame first_frame(const core::video_field field) override { return frame_; }
+    core::draw_frame peek_frame(const core::video_field field) override { return frame_; }
 
     bool is_ready() override { return true; }
 

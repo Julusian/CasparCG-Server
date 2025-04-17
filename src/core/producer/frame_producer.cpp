@@ -66,7 +66,7 @@ const spl::shared_ptr<frame_producer>& frame_producer::empty()
             return make_ready_future(std::wstring());
         }
         draw_frame           last_frame(const core::video_field field) override { return draw_frame{}; }
-        draw_frame           first_frame(const core::video_field field) override { return draw_frame{}; }
+        draw_frame           peek_frame(const core::video_field field) override { return draw_frame{}; }
         core::monitor::state state() const override
         {
             static const monitor::state empty;

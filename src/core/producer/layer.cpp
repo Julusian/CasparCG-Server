@@ -151,7 +151,7 @@ struct layer::impl
     draw_frame receive_background(const video_field field, int nb_samples)
     {
         try {
-            return background_->first_frame(field);
+            return draw_frame::still(background_->peek_frame(field));
 
         } catch (...) {
             CASPAR_LOG_CURRENT_EXCEPTION();

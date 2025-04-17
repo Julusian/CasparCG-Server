@@ -162,6 +162,20 @@ class route_producer
         }
     }
 
+    draw_frame peek_frame(const core::video_field field) override {
+        // TODO this doesnt work with the type of queue
+//        std::pair<core::draw_frame, core::draw_frame> frame;
+//
+//        if (frame_) {
+//            frame = *frame_;
+//        } else {
+//            buffer_.peek(frame);
+//        }
+//
+//
+        return draw_frame{};
+    }
+
     bool is_ready() override { return true; }
 
     std::wstring print() const override { return L"route[" + route_->name + L"]"; }

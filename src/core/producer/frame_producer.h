@@ -47,8 +47,6 @@ class frame_producer
 
     uint32_t         frame_number_ = 0;
     core::draw_frame last_frame_;
-    core::draw_frame first_frame_;
-    bool             is_ready_ = false;
 
   public:
     static const spl::shared_ptr<frame_producer>& empty();
@@ -58,25 +56,17 @@ class frame_producer
 
     draw_frame receive(const video_field field, int nb_samples)
     {
-        if (frame_number_ == 0 && first_frame_) {
-            frame_number_ += 1;
-            return first_frame_;
-        }
-
         auto frame = receive_impl(field, nb_samples);
 
         if (frame) {
             frame_number_ += 1;
             last_frame_ = frame;
-
-            if (!first_frame_) {
-                first_frame_ = frame;
-            }
         }
 
         return frame;
     }
 
+    virtual draw_frame peek_frame(const video_field field) = 0;
     virtual draw_frame receive_impl(const video_field field, int nb_samples) = 0;
 
     virtual std::future<std::wstring> call(const std::vector<std::wstring>& params)
@@ -91,17 +81,8 @@ class frame_producer
     virtual uint32_t             nb_frames() const { return std::numeric_limits<uint32_t>::max(); }
     virtual draw_frame           last_frame(const video_field field)
     {
-        if (!last_frame_) {
-            last_frame_ = receive_impl(field, 0);
-        }
+        // Note: this must not pull a frame, as that messes with the nb_samples
         return core::draw_frame::still(last_frame_);
-    }
-    virtual draw_frame first_frame(const video_field field)
-    {
-        if (!first_frame_) {
-            first_frame_ = receive_impl(field, 0);
-        }
-        return core::draw_frame::still(first_frame_);
     }
     virtual void                            leading_producer(const spl::shared_ptr<frame_producer>&) {}
     virtual spl::shared_ptr<frame_producer> following_producer() const { return core::frame_producer::empty(); }
@@ -136,7 +117,7 @@ class const_producer : public core::frame_producer
             return frame1_;
     }
 
-    core::draw_frame first_frame(const core::video_field field) override { return last_frame(field); }
+    core::draw_frame peek_frame(const core::video_field field) override { return last_frame(field); }
 
     core::draw_frame receive_impl(const video_field field, int nb_samples) override { return last_frame(field); }
 

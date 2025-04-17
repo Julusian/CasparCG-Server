@@ -125,7 +125,7 @@ class destroy_producer_proxy : public frame_producer
     uint32_t             frame_number() const override { return producer_->frame_number(); }
     uint32_t             nb_frames() const override { return producer_->nb_frames(); }
     draw_frame           last_frame(const core::video_field field) override { return producer_->last_frame(field); }
-    draw_frame           first_frame(const core::video_field field) override { return producer_->first_frame(field); }
+    draw_frame           peek_frame(const core::video_field field) override { return producer_->peek_frame(field); }
     core::monitor::state state() const override { return producer_->state(); }
     bool                 is_ready() override { return producer_->is_ready(); }
 };

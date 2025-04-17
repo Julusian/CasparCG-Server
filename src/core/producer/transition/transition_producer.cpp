@@ -59,9 +59,6 @@ class transition_producer : public frame_producer
 
     void update_is_ready(const core::video_field field)
     {
-        // Ensure a frame has been attempted
-        dst_producer_->first_frame(field);
-
         dst_is_ready_ = dst_producer_->is_ready();
     }
 
@@ -71,21 +68,14 @@ class transition_producer : public frame_producer
 
         update_is_ready(field);
 
-        if (!dst_is_ready_) {
-            return src_producer_->last_frame(field);
-        }
-
-        auto src = src_producer_->last_frame(field);
-        auto dst = dst_producer_->last_frame(field);
-
-        if (dst && current_frame_ >= info_.duration) {
-            return dst;
+        if (dst_is_ready_ && current_frame_ >= info_.duration) {
+            return dst_producer_->last_frame(field);
         } else {
-            return src;
+            return src_producer_->last_frame(field);
         }
     }
 
-    core::draw_frame first_frame(const core::video_field field) override { return dst_producer_->first_frame(field); }
+    core::draw_frame peek_frame(const core::video_field field) override { return dst_producer_->peek_frame(field); }
 
     void leading_producer(const spl::shared_ptr<frame_producer>& producer) override { src_producer_ = producer; }
 
@@ -129,14 +119,20 @@ class transition_producer : public frame_producer
             return src_producer_->receive(field, nb_samples);
         }
 
+        // TODO - review this
+
+        auto src_peek = src_producer_->peek_frame(field);
+        if (!src_peek) {
+            // Fallback to last_frame
+            return draw_frame{};
+        }
+
+        // This must be a valid frame
+        auto src = src_producer_->receive(field, nb_samples);
+
         auto dst = dst_producer_->receive(field, nb_samples);
         if (!dst) {
             dst = dst_producer_->last_frame(field);
-        }
-
-        auto src = src_producer_->receive(field, nb_samples);
-        if (!src) {
-            src = src_producer_->last_frame(field);
         }
 
         if (!dst) {

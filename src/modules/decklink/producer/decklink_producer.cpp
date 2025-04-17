@@ -920,7 +920,8 @@ class decklink_producer_proxy : public core::frame_producer
         return producer_->get_frame(field, false);
     }
 
-    core::draw_frame first_frame(const core::video_field field) override { return receive_impl(field, 0); }
+    // TODO - check this
+    core::draw_frame peek_frame(const core::video_field field) override { return receive_impl(field, 0); }
 
     core::draw_frame last_frame(const core::video_field field) override
     {

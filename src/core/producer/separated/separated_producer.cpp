@@ -61,8 +61,6 @@ class separated_producer : public frame_producer
 
     spl::shared_ptr<frame_producer> fill_producer_;
     spl::shared_ptr<frame_producer> key_producer_;
-    frame_pair                      fill_;
-    frame_pair                      key_;
 
   public:
     explicit separated_producer(const spl::shared_ptr<frame_producer>& fill, const spl::shared_ptr<frame_producer>& key)
@@ -78,9 +76,15 @@ class separated_producer : public frame_producer
     {
         return draw_frame::mask(fill_producer_->last_frame(field), key_producer_->last_frame(field));
     }
-    draw_frame first_frame(const core::video_field field) override
+    draw_frame peek_frame(const core::video_field field) override
     {
-        return draw_frame::mask(fill_producer_->first_frame(field), key_producer_->first_frame(field));
+        auto fill = fill_producer_->peek_frame(field);
+        auto key = key_producer_->peek_frame(field);
+        if (key && fill) {
+            return draw_frame::mask(fill, key);
+        } else {
+         return draw_frame{};
+        }
     }
 
     draw_frame receive_impl(const core::video_field field, int nb_samples) override
@@ -91,29 +95,19 @@ class separated_producer : public frame_producer
             state_["keyer"] = key_producer_->state();
         };
 
-        auto fill = fill_.get(field);
-        auto key  = key_.get(field);
+        auto fill_peek = fill_producer_->peek_frame(field);
+        auto key_peek = key_producer_->peek_frame(field);
 
-        if (!fill) {
-            fill = fill_producer_->receive(field, nb_samples);
-        }
-
-        if (!key) {
-            key = key_producer_->receive(field, nb_samples);
-        }
-
-        if (!fill || !key) {
-            fill_.set(field, fill);
-            key_.set(field, key);
+        if (!fill_peek || !key_peek) {
+            // fallback to last_frame
             return core::draw_frame{};
         }
 
-        auto frame = draw_frame::mask(fill, key);
+        // These must contain valid frames
+        auto fill = fill_producer_->receive(field,nb_samples);
+        auto key  = key_producer_->receive(field, nb_samples);
 
-        fill_.set(field, draw_frame{});
-        key_.set(field, draw_frame{});
-
-        return frame;
+        return draw_frame::mask(fill, key);
     }
 
     uint32_t frame_number() const override { return fill_producer_->frame_number(); }

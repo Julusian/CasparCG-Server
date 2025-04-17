@@ -196,6 +196,16 @@ class html_client
         return last_frame_;
     }
 
+    core::draw_frame peek_frame(const core::video_field field)
+    {
+        std::lock_guard<std::mutex> lock(frames_mutex_);
+
+        if (frames_.empty())
+            return core::draw_frame{};
+
+        return frames_.front().second;
+    }
+
     core::draw_frame last_frame() const { return last_frame_; }
 
     bool is_ready() const
@@ -479,7 +489,13 @@ class html_producer : public core::frame_producer
         return core::draw_frame::empty();
     }
 
-    core::draw_frame first_frame(const core::video_field field) override { return receive_impl(field, 0); }
+    core::draw_frame peek_frame(const core::video_field field) override {
+        if (client_ != nullptr) {
+            return client_->peek_frame(field);
+        }
+
+        return core::draw_frame::empty();
+    }
 
     bool is_ready() override
     {

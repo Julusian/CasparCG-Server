@@ -374,6 +374,8 @@ struct image_scroll_producer : public core::frame_producer
 
     void set_speed(double speed) { speed_ = speed_tweener(speed, speed, 0, tweener(L"linear")); }
 
+    core::draw_frame peek_frame(const core::video_field field) override { return core::draw_frame{}; }
+
     core::draw_frame receive_impl(const core::video_field field, int nb_samples) override
     {
         frame_ = render_frame(true, true);

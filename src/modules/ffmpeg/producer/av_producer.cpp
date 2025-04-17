@@ -980,6 +980,19 @@ struct AVProducer::Impl
         return core::draw_frame::still(frame_);
     }
 
+    core::draw_frame peek_frame(const core::video_field field)
+    {
+        if (frame_) return frame_;
+
+
+        boost::lock_guard<boost::mutex> lock(buffer_mutex_);
+        if (!buffer_.empty()) {
+            return buffer_[0].frame;
+        }
+
+        return core::draw_frame{};
+    }
+
     bool is_ready()
     {
         boost::lock_guard<boost::mutex> lock(buffer_mutex_);
@@ -1267,6 +1280,8 @@ AVProducer::AVProducer(std::shared_ptr<core::frame_factory> frame_factory,
 core::draw_frame AVProducer::next_frame(const core::video_field field) { return impl_->next_frame(field); }
 
 core::draw_frame AVProducer::prev_frame(const core::video_field field) { return impl_->prev_frame(field); }
+
+core::draw_frame AVProducer::peek_frame(const core::video_field field) { return impl_->peek_frame(field); }
 
 bool AVProducer::is_ready() { return impl_->is_ready(); }
 

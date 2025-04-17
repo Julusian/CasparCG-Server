@@ -29,6 +29,7 @@ class AVProducer
                core::frame_geometry::scale_mode     scale_mode);
 
     core::draw_frame prev_frame(const core::video_field field);
+    core::draw_frame peek_frame(const core::video_field field);
     core::draw_frame next_frame(const core::video_field field);
     bool             is_ready();
 
